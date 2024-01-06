@@ -2,49 +2,8 @@
 
 set -e
 
-[ "$LFS" = "" ] && exit 1
-[ "$LFS_TGT" = "" ] && exit 1
-[ "$(whoami)" = "lfs" ] && echo "INFO: ..." || exit 1
+. ./load-todo.sh
 
-SOURCES="$LFS/sources"
-[ ! -e "$SOURCES" ] && exit 1
-ALL="$SOURCES/all"
-mkdir -pv "$ALL"
-
-
-check_nop() {
-  echo
-  echo "========================"
-  _cwd=$(pwd)
-  _ver=$(basename $_cwd | cut -d '-' -f2)
-  echo "INFO: pwd - $_cwd, version - $_ver"
-  return 0
-}
-
-check_pkg() {
-  name="$1"
-  output="$2"
-  [ "$output" = "" ] && output="build"
-  echo "INFO: checking $name ..."
-
-  pkg="$(ls $SOURCES | grep ^$name | grep -v patch$)"
-  [ "$pkg" = "" ] && return 1
-  z_pkg="$SOURCES/$pkg"
-  echo "INFO: compress pkg - $z_pkg"
-  [ ! -f "$z_pkg" ] && return 1
-
-  cd $ALL || return 1
-  pkg="$(ls . | grep ^$name)"
-  [ "$pkg" = "" ] && (tar xf "$z_pkg")
-  pkg="$(ls . | grep ^$name)"
-  [ "$pkg" = "" ] && return 1
-
-  d_pkg="$ALL/$pkg"
-  echo "INFO: decompress pkg - $d_pkg/$output"
-  cd $d_pkg || return 1
-  [ -e "$output" ] && return 1
-  return 0
-}
 
 go_binutils() {
   check_pkg "binutils" || return
@@ -59,9 +18,9 @@ go_binutils() {
     --disable-nls       \
     --enable-gprofng=no \
     --disable-werror
+
   make
   make install
-  echo "====END===="
 }
 
 go_gcc() {
@@ -121,6 +80,7 @@ go_gcc() {
     --disable-libvtv          \
     --disable-libstdcxx       \
     --enable-languages=c,c++
+
   make
   make install
 
@@ -128,7 +88,6 @@ go_gcc() {
   cd ..
   cat gcc/limitx.h gcc/glimits.h gcc/limity.h > \
     `dirname $($LFS_TGT-gcc -print-libgcc-file-name)`/include/limits.h
-  echo "====END===="
 }
 
 # linux-api headers:
@@ -152,7 +111,6 @@ go_linux_api() {
   make headers
   find usr/include -type f ! -name '*.h' -delete
   cp -rv usr/include $LFS/usr
-  echo "====END===="
 }
 
 go_glibc() {
@@ -188,6 +146,7 @@ go_glibc() {
       --enable-kernel=4.14               \
       --with-headers=$LFS/usr/include    \
       libc_cv_slibdir=/usr/lib
+
   # use -j1 to avoid failure
   make
   make -j1
@@ -195,15 +154,6 @@ go_glibc() {
   
   # update loading path in ldd
   sed '/RTLDLIST=/s@/usr@@g' -i $LFS/usr/bin/ldd
-  echo "====END===="
-}
-
-do_check_glibc() {
-  cd /tmp/
-  echo 'int main(){}' | $LFS_TGT-gcc -xc -
-  readelf -l a.out | grep ld-linux
-  #OK: [Requesting program interpreter: /lib64/ld-linux-x86-64.so.2]
-  rm -v a.out
 }
 
 go_libstdcpp() {
@@ -225,7 +175,6 @@ go_libstdcpp() {
   make
   make DESTDIR=$LFS install
   rm -v $LFS/usr/lib/lib{stdc++,stdc++fs,supc++}.la
-  echo "====END===="
 }
 
 do_clean() {
@@ -236,30 +185,17 @@ do_clean() {
   rm -rf $ALL/glibc*
 }
 
-do_action() {
-  export MAKEFLAGS="-j3"
-  item="$1"
-  if [ "$item" = "all" ]; then
-    go_binutils
-    go_gcc
-    go_linux_api
-    go_glibc
-    go_libstdcpp
-  else
-    go_$item
-  fi
+do_test() {
+  # check glibc
+  cd /tmp/
+  echo 'int main(){}' | $LFS_TGT-gcc -xc -
+  readelf -l a.out | grep ld-linux
+  #OK: [Requesting program interpreter: /lib64/ld-linux-x86-64.so.2]
+  rm -v a.out
 }
 
 
-action="$1"
-if [ "$action" = "" ]; then
-  echo "usage: $0 clean|test|all (binutils|gcc|linux_api|glibc|libstdcpp)"
-  echo
-elif [ "$action" = "clean" ]; then
-  do_clean
-elif [ "$action" = "test" ]; then
-  do_check_glibc
-else
-  do_action $action
-fi
+ALL_ACTS="test clean"
+ALL_LIBS="binutils gcc linux_api glibc libstdcpp"
+check_todo "cross" "$1"
 
