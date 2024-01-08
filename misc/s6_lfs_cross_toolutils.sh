@@ -13,7 +13,7 @@ go_m4() {
   ./configure \
     --prefix=/usr   \
     --host=$LFS_TGT \
-    --build=$(build-aux/config.guess)
+    --build=$(./build-aux/config.guess)
 
   make
   make DESTDIR=$LFS install
@@ -78,7 +78,7 @@ go_coreutils() {
   ./configure \
     --prefix=/usr                     \
     --host=$LFS_TGT                   \
-    --build=$(build-aux/config.guess) \
+    --build=$(./build-aux/config.guess) \
     --enable-install-program=hostname \
     --enable-no-install-program=kill,uptime \
     gl_cv_macro_MB_CUR_MAX_good=y
@@ -138,7 +138,7 @@ go_findutils() {
     --prefix=/usr                   \
     --localstatedir=/var/lib/locate \
     --host=$LFS_TGT                 \
-    --build=$(build-aux/config.guess)
+    --build=$(./build-aux/config.guess)
 
   make
   make DESTDIR=$LFS install
@@ -155,7 +155,7 @@ go_gawk() {
   ./configure \
     --prefix=/usr   \
     --host=$LFS_TGT \
-    --build=$(build-aux/config.guess)
+    --build=$(./build-aux/config.guess)
 
   make
   make DESTDIR=$LFS install
@@ -194,7 +194,7 @@ go_make() {
     --prefix=/usr   \
     --without-guile \
     --host=$LFS_TGT \
-    --build=$(build-aux/config.guess)
+    --build=$(./build-aux/config.guess)
 
   make
   make DESTDIR=$LFS install
@@ -208,7 +208,7 @@ go_patch() {
   ./configure \
     --prefix=/usr   \
     --host=$LFS_TGT \
-    --build=$(build-aux/config.guess)
+    --build=$(./build-aux/config.guess)
 
   make
   make DESTDIR=$LFS install
@@ -236,7 +236,7 @@ go_tar() {
   ./configure \
     --prefix=/usr                     \
     --host=$LFS_TGT                   \
-    --build=$(build-aux/config.guess)
+    --build=$(./build-aux/config.guess)
 
   make
   make DESTDIR=$LFS install
@@ -252,7 +252,7 @@ go_xz() {
   ./configure \
     --prefix=/usr                     \
     --host=$LFS_TGT                   \
-    --build=$(build-aux/config.guess) \
+    --build=$(./build-aux/config.guess) \
     --disable-static                  \
     --docdir=/usr/share/doc/xz-$ver
 

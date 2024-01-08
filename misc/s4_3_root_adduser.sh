@@ -1,5 +1,10 @@
 #!/bin/bash
 
+set -e
+
+. ./load-todo.sh
+check_env_root
+
 [ "$LFS" = "" ] && exit 1
 
 groupadd lfs
@@ -12,4 +17,4 @@ case $(uname -m) in
   x86_64) chown -v lfs $LFS/lib64 ;;
 esac
 
-su - lfs
+#su - lfs

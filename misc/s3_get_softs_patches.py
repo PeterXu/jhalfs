@@ -9,8 +9,8 @@ url_packages = "https://www.linuxfromscratch.org/lfs/view/stable/chapter03/packa
 url_patches = "https://www.linuxfromscratch.org/lfs/view/stable/chapter03/patches.html"
 
 LFS = os.environ.get("LFS")
-if not LFS or not os.path.exists(LFS):
-    print(">ERROR: no LFS env")
+if not LFS or len(LFS.strip()) < 3 or not os.path.exists(LFS):
+    print(">ERROR: invalid LFS env")
     sys.exit(-1)
 
 
@@ -60,6 +60,15 @@ def parse_url(url, name, exts):
         print(">===================\n")
 
 
-parse_url(url_packages, "lfs_packages.html", [".gz", ".xz"])
-parse_url(url_patches, "lfs_patches.html", [".patch"])
+if __name__ == "__main__":
+    action = None
+    if len(sys.argv) == 2:
+        action = sys.argv[1]
+    if action == "packages":
+        parse_url(url_packages, "lfs_packages.html", [".gz", ".xz"])
+    elif action == "patches":
+        parse_url(url_patches, "lfs_patches.html", [".patch"])
+    else:
+        print("usage: %s packages|patches" % sys.argv[0])
+        print()
 

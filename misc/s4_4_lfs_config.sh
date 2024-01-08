@@ -1,7 +1,8 @@
 #!/bin/bash
 
-[ "$(whoami)" = "lfs" ] && echo "INFO: config..." || exit 1
+set -e
 
+[ ! "$(whoami)" = "lfs" ] && echo "WARN: not user - lfs!" && exit 1
 
 # should by lfs
 cat > ~/.bash_profile << "EOF"
@@ -9,6 +10,7 @@ exec env -i HOME=$HOME TERM=$TERM PS1='\u:\w\$ ' /bin/bash
 EOF
 
 # should set LFS with string not var
+echo "INFO: add env-LFS(default /media/ddisk) to .bashrc!"
 cat > ~/.bashrc << "EOF"
 set +h
 umask 022

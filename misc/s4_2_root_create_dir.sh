@@ -1,5 +1,10 @@
 #!/bin/bash
 
+set -e
+
+. ./load-todo.sh
+check_env_root
+
 [ "$LFS" = "" ] && exit 1
 
 mkdir -pv $LFS/{etc,var} $LFS/usr/{bin,lib,sbin}

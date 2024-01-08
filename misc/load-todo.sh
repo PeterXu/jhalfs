@@ -10,14 +10,21 @@ check_env_nop() {
   echo
 }
 
+check_env_root() {
+  [ "$LFS" = "" ] && echo "WARN: no env LFS!" && exit 1
+  [ ! -e "$LFS/sources/wspace" ] && echo "WARN: no $LFS/sources/wspace!" && exit 1
+  [ ! "$(whoami)" = "root" ] && echo "WARN: not user - root!" && exit 1
+  return 0
+}
+
 # for compile cross
 check_env_cross() {
   [ "$LFS" = "" ] && echo "WARN: no env LFS!" && exit 1
   [ "$LFS_TGT" = "" ] && echo "WARN: no env LFS_TGT" && exit 1
-  [ "$(whoami)" = "lfs" ] || exit 1
+  [ ! "$(whoami)" = "lfs" ] && echo "WARN: not user - lfs!" && exit 1
 
   SOURCES="$LFS/sources"
-  [ ! -e "$SOURCES" ] && exit 1
+  [ ! -e "$SOURCES" ] && echo "WARN: no $SOURCES!" && exit 1
   ALL="$SOURCES/all"
   mkdir -pv "$ALL"
 }
@@ -25,7 +32,7 @@ check_env_cross() {
 # for compile zen
 check_env_zen() {
   SOURCES="/sources"
-  [ ! -e "$SOURCES" ] && echo "WARN: no /sources!" && exit 1
+  [ ! -e "$SOURCES" ] && echo "WARN: no $SOURCES!" && exit 1
   ALL="$SOURCES/allone"
   mkdir -pv "$ALL"
 }
@@ -118,6 +125,7 @@ check_todo() {
     # then do mode-checking
     case $mode in 
       nop)   check_env_nop;;
+      root)  check_env_root;;
       cross) check_env_cross;;
       zen)   check_env_zen;;
       *)     echo "WARN: no mode set!(nop|cross|zen)" && exit 1;;

@@ -4,13 +4,6 @@ set -e
 
 . ./load-todo.sh
 
-detect_root_lfs() {
-  [ "$(whoami)" = "root" ] || return 1
-  [ "$LFS" = "" ] && return 1
-  [ -e "$LFS/lost+found" ] || return 1
-  [ -e "$LFS/sources/wspace" ] || return 1
-  return 0
-}
 
 do_change_root() {
   detect_root_lfs || return
@@ -90,5 +83,5 @@ do_restore() {
 
 
 ALL_ACTS="change_root prepare_vfs enter_chroot backup restore"
-check_todo "nop" "$1"
+check_todo "root" "$1"
 
