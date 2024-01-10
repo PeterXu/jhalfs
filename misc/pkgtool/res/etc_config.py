@@ -1,3 +1,11 @@
+
+etc_adjtime = """
+0.0 0 0.0
+0
+LOCAL
+"""
+
+etc_inputrc = """
 # Begin /etc/inputrc
 # Modified by Chris Lynn <roryo@roryo.dynup.net>
 
@@ -39,3 +47,14 @@ set bell-style none
 "\e[F": end-of-line
 
 # End /etc/inputrc
+"""
+
+etc_shells = """
+# Begin /etc/shells
+
+/bin/sh
+/bin/bash
+
+# End /etc/shells
+"""
+

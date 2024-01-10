@@ -4,26 +4,11 @@
 import os
 import sys
 import enum
-import tokenize
 from pathlib import Path
 
 
-##============================
-## >P0: common tools
-##============================
-
-def _write_lines(ppath, lines):
-    count = 0
-    with ppath.open("w") as fp:
-        for item in lines:
-            if count > 0: fp.write("\n")
-            fp.write(item)
-            count += 1
-    return count == len(lines)
-
-
 ##=========================
-## >P1: command kind/parse
+## >P0: command kind/parse
 ##=========================
 
 class CommandKind(enum.Enum):
@@ -63,9 +48,9 @@ def _parse_cmd(name):
     return None
 
 
-##==============================
-## >P2: some decorate functions
-##==============================
+##=========================
+## >P1: decorate functions
+##=========================
 
 def df_decorate(func, kind):
     def wrapper(*args, **kwargs):
@@ -82,11 +67,11 @@ def df_further_help(func):
     return df_decorate(func, CommandKind.FURTHER_HELP)
 
 
-##=====================================
-## >P3: some commands and descriptions
-##=====================================
+##================================
+## >P2: commands and descriptions
+##================================
 
-#reserverd for begin-marking
+#>reserverd for begin-marking
 def _todo_begin():
     pass
 
@@ -475,139 +460,56 @@ def do_help(args):
     print()
     return True
 
+#>reserverd for end-marking
 def _todo_end():
-    #reserverd for end-marking
     pass
 
 
-##========================
-## >P4: some implemations
-##========================
+##======================
+## >PP: loading/initing
+##======================
 
-def _do_test():
-    print(__name__)
+import mods.system_config as syscfg
+from docs.parser import todo_parse_docs
+try:
+    from docs.generated import ALL_DOCS
+except:
+    ALL_DOCS = []
 
-def _do_set_ip_or_dhcp(name, is_dhcp, addr=None, gw=None, dns=None, domains=None):
-    if not name:
-        return False
-    if not is_dhcp and not (addr and gw and dns and domains):
-        return False
-    start = 10
-    netp = None
-    netd = "/etc/systemd/network"
-    netf = "%s-eth-dhcp.network" if is_dhcp else "%s-eth-static.network"
-    while start < 90:
-        netp = Path(netd).joinpath(netf % start)
-        if not netp.exists(): break
-        start += 5
-        netp = None
-    if not netp:
-        return False
-    lines = []
-    lines.append("[Match]\nName=%s" % name)
-    lines.append("")
-    if not is_dhcp:
-        lines.append("[Network]\nAddress=%s\nGateway=%s\nDNS=%s\nDomains=%s" % (addr, gw, dns, domains))
-    else:
-        lines.append("[Network]\nDHCP=ipv4")
-        lines.append("[DHCPv4]\nUseDomains=true")
-    return _write_lines(netp, lines)
+def _do_init():
+    try:
+        items = todo_parse_docs(__file__)
+    except:
+        items = ALL_DOCS
+    for item in items:
+        name, key, doc = item
+        _add_cmd_prop(_parse_cmd(name), key, doc)
+    pass
 
-def _do_set_hosts(ADDR, FQDN, HOSTNAME, alias=[]):
-    hostsp = Path("/etc/hosts")
-    if hostsp.exists():
-        return False
-    lines = []
-    lines.append("# Begin /etc/hosts")
-    lines.append("")
-    lines.append("127.0.0.1 localhost.localdomain localhost")
-    #127.0.1.1 <FQDN> <HOSTNAME>
-    if FQDN and HOSTNAME:
-        lines.append("127.0.1.1 %s %s" % (FQDN, HOSTNAME))
-    #<192.168.0.2> <FQDN> <HOSTNAME> [alias1] [alias2] ...
-    if ADDR and FQDN and HOSTNAME:
-        parts = [ADDR, FQDN, HOSTNAME]
-        parts.extend(alias)
-        lines.append(" ".join(parts))
-    lines.append("::1       localhost ip6-localhost ip6-loopback")
-    lines.append("ff02::1   ip6-allnodes")
-    lines.append("ff02::2   ip6-allrouters")
-    lines.append("")
-    lines.append("# End /etc/hosts")
-    return _write_lines(hostsp, lines)
-
-def _do_set_adjtime():
-    fpath = Path("/etc/adjtime")
-    if fpath.exists(): return False
-    if etc_adjtime: fpath.write_text(etc_adjtime)
-
-def _do_set_inputrc():
-    fpath = Path("/etc/inputrc")
-    if fpath.exists(): return False
-    if etc_inputrc: fpath.write_text(etc_inputrc)
-
-def _do_set_shells():
-    fpath = Path("/etc/shells")
-    if fpath.exists(): return False
-    if etc_shells: fpath.write_text(etc_shells)
-
-
-##==========================
-## >P5: load res variabls
-##==========================
-
-etc_adjtime = None
-etc_inputrc = None
-etc_shells =  None
-
-
-##==========================
-## >PP: main init and entry
-##==========================
-
-def todo_init():
-    def _extract_name(token):
-        if token.type != tokenize.NAME or token.string != 'def' or token.start[1] != 0: return None
-        parts = token.line.split()
-        return parts[1].split("(")[0].strip() if len(parts) >= 2 else None
-    def _extract_doc(text):
-        key, data = '"""', text.strip()
-        if not data.startswith(key): return None
-        pp = data[len(key):]
-        return pp[:len(pp)-len(key)].strip()
-
-    # parse cmd docs
-    docs = []
-    with tokenize.open(__file__) as f:
-        is_begin = False
-        for token in tokenize.generate_tokens(f.readline):
-            name = _extract_name(token)
-            if name:
-                if name.startswith("_todo_begin"): is_begin = True
-                elif name.startswith("_todo_end"): break
-                elif name.startswith("do_"): docs.append(["def", name, token])
-            elif is_begin:
-                doc = _extract_doc(token.string)
-                if doc: docs.append(["doc", doc, token])
-        pass
-
-    # add docs to dict
-    last_item = None
-    for item in docs:
-        if last_item:
-            name, doc, key = None, None, None
-            if item[0] == "def" and last_item[0] == "doc" and last_item[2].start[1] == 0:
-                name, doc, key = item[1], last_item[1], "detail"
-            elif item[0] == "doc" and last_item[0] == "def" and item[2].start[1] > 0:
-                name, doc, key = last_item[1], item[1], "simple"
-            _add_cmd_prop(_parse_cmd(name), key, doc)
-        last_item = item
+def _do_generate():
+    try:
+        items = todo_parse_docs(__file__)
+    except:
+        items = []
+    ppath = Path("docs/generated.py")
+    with ppath.open("w") as fp:
+        fp.write('ALL_DOCS = [\n')
+        for item in items:
+            fp.write('  [\n')
+            fp.write('    "%s",\n' % item[0])
+            fp.write('    "%s",\n' % item[1])
+            fp.write('    """%s"""\n' % item[2])
+            fp.write('  ],\n')
+        fp.write(']')
     pass
 
 if __name__ == '__main__':
-    todo_init()
+    _do_init()
     if len(sys.argv) < 2:
         do_help(None)
+        sys.exit(0)
+    if sys.argv[1] == "generate":
+        _do_generate()
         sys.exit(0)
     cmd = _get_cmd(sys.argv[1])
     bret = cmd["func"](sys.argv[2:]) if cmd else None
