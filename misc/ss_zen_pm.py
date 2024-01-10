@@ -3,15 +3,15 @@
 
 import os
 import sys
-from enum import Enum
+import enum
 import tokenize
 
 
-##====================
-## command kind/parse
-##====================
+##=========================
+## >P1: command kind/parse
+##=========================
 
-class CommandKind(Enum):
+class CommandKind(enum.Enum):
     ALL             = 1,
     COMMON_USAGE    = 21,
     TROUBLE_SHOOT   = 22,
@@ -39,38 +39,39 @@ def _add_cmd_prop(cmd, key, val):
     cret = _ALL_COMMANDS[CommandKind.ALL].get(cmd, None)
     if cret: cret[key] = val
 
-#> name format: <do_xxxx>
+# name format: <do_xxxx>
 def _parse_cmd(name):
+    if not name: return None
     parts = name.strip().split("_")
     if len(parts) >= 2 and parts[0] == "do":
         return parts[1]
     return None
 
 
-##=========================
-## some decorate functions
-##=========================
+##==============================
+## >P2: some decorate functions
+##==============================
 
 def df_decorate(func, kind):
     def wrapper(*args, **kwargs):
         return func(*args, **kwargs)
     cmd = _parse_cmd(func.__name__)
-    if cmd:
-        _add_kind_cmd(kind, cmd)
-        _add_cmd_prop(cmd, "func", func)
+    _add_kind_cmd(kind, cmd)
+    _add_cmd_prop(cmd, "func", func)
     return wrapper
-def cmd_common(func):
+def df_common(func):
     return df_decorate(func, CommandKind.COMMON_USAGE)
-def cmd_trouble_shoot(func):
+def df_trouble_shoot(func):
     return df_decorate(func, CommandKind.TROUBLE_SHOOT)
-def cmd_further_help(func):
+def df_further_help(func):
     return df_decorate(func, CommandKind.FURTHER_HELP)
 
 
-##===============================
-## some commands and descriptions
-##===============================
+##=====================================
+## >P3: some commands and descriptions
+##=====================================
 
+#reserverd for begin-marking
 def _todo_begin():
     pass
 
@@ -89,10 +90,11 @@ text is flanked by slashes, it is interpreted as a regular expression.
   -v, --verbose                    Make some output more verbose.
   -h, --help                       Show this message.
 """
-@cmd_common
+@df_common
 def do_search(args):
     """[options] text|/regex/ [...]"""
     pass
+    return True
 
 """
 Display brief statistics for your Homebrew installation. If a formula or
@@ -107,10 +109,11 @@ cask is provided, show summary of information about it.
   -q, --quiet                      Make some output more quiet.
   -h, --help                       Show this message.
 """
-@cmd_common
+@df_common
 def do_info(args):
     """[options] [formula|cask ...]"""
     pass
+    return True
 
 """
 Install a formula or cask. Additional options specific to a formula may be
@@ -175,10 +178,11 @@ upgrade formula if it is already installed but outdated.
   -q, --quiet                      Make some output more quiet.
   -h, --help                       Show this message.
 """
-@cmd_common
+@df_common
 def do_install(args):
     """[options] formula|cask [...]"""
     pass
+    return True
 
 """
 Uninstall a formula or cask.
@@ -197,10 +201,11 @@ Uninstall a formula or cask.
   -v, --verbose                    Make some output more verbose.
   -h, --help                       Show this message.
 """
-@cmd_common
+@df_common
 def do_uninstall(args):
     """[options] installed_formula|installed_cask"""
     pass
+    return True
 
 """
 Fetch the newest version of Homebrew and all formulae from GitHub using git(1)
@@ -219,10 +224,11 @@ and perform any necessary migrations.
                                    are executed.
   -h, --help                       Show this message.
 """
-@cmd_common
+@df_common
 def do_update(args):
     """[options]"""
     pass
+    return True
 
 """
 Upgrade outdated casks and outdated, unpinned formulae using the same options
@@ -261,10 +267,11 @@ the upgraded formulae or, every 30 days, for all formulae.
   -q, --quiet                      Make some output more quiet.
   -h, --help                       Show this message.
 """
-@cmd_common
+@df_common
 def do_upgrade(args):
     """[options] [outdated_formula|outdated_cask ...]"""
     pass
+    return True
 
 """
 List all installed formulae and casks. If formula is provided, summarise the
@@ -284,10 +291,11 @@ paths within its current keg. If cask is provided, list its artifacts.
   -v, --verbose                    Make some output more verbose.
   -h, --help                       Show this message.
 """
-@cmd_common
+@df_common
 def do_list(args):
     """[options] [installed_formula|installed_cask ...]"""
     pass
+    return True
 
 #------------------
 
@@ -312,6 +320,7 @@ installations.
 def do_link(args):
     """[options] installed_formula [...]"""
     pass
+    return True
 
 """
 Remove symlinks for formula from Homebrew's prefix. This can be useful for
@@ -328,6 +337,7 @@ brew link formula
 def do_unlink(args):
     """[--dry-run] installed_formula [...]"""
     pass
+    return True
 
 """
 Pin the specified formula, preventing them from being upgraded when issuing
@@ -344,6 +354,7 @@ not install or run correctly.
 def do_pin(args):
     """installed_formula [...]"""
     pass
+    return True
 
 """
 Unpin formula, allowing them to be upgraded by brew upgrade formula. See
@@ -369,10 +380,11 @@ bug report, you will be required to provide this information.
   -v, --verbose                    Make some output more verbose.
   -h, --help                       Show this message.
 """
-@cmd_trouble_shoot
+@df_trouble_shoot
 def do_config(args):
-    """-"""
+    """"""
     pass
+    return True
 
 """
 Check your system for potential problems. Will exit with a non-zero status if
@@ -391,10 +403,11 @@ working fine: please don't worry or file an issue; just ignore this.
   -v, --verbose                    Make some output more verbose.
   -h, --help                       Show this message.
 """
-@cmd_trouble_shoot
+@df_trouble_shoot
 def do_doctor(args):
     """[--list-checks] [--audit-debug] [diagnostic_check ...]"""
     pass
+    return True
 
 #------------------
 
@@ -408,7 +421,7 @@ Show lists of built-in and external commands.
   -v, --verbose                    Make some output more verbose.
   -h, --help                       Show this message.
 """
-@cmd_further_help
+@df_further_help
 def do_commands(args):
     """[--quiet] [--include-aliases]"""
     if args:
@@ -417,32 +430,27 @@ def do_commands(args):
     for k in _get_kind(CommandKind.ALL):
         print("  zen", k)
     print()
+    return True
 
 
-@cmd_further_help
+@df_further_help
 def do_help(args):
-    if args:
-        cmd = args[0]
-        if cmd == "help":
-            do_help(None)
-            return True
-        val = _get_cmd(cmd)
-        if not val:
+    if args and args[0] != "help":
+        cmd = _get_cmd(args[0])
+        if not cmd:
             print("Error: Unknown command: ", args[0], "\n")
             return False
-        print("Usage: zen", cmd, val.get("simple", ""), "\n")
-        print(val.get("detail"), "\n")
+        print("Usage: zen", args[0], cmd.get("simple", ""), "\n")
+        print(cmd.get("detail"), "\n")
         return True
 
     print("Example usage:")
     ckind = _get_kind(CommandKind.COMMON_USAGE)
     for k in ckind:
         print("  zen", k, ckind[k].get("simple", "").upper())
-
     print("\nTroubleshooting:")
     for k in _get_kind(CommandKind.TROUBLE_SHOOT):
         print("  zen", k)
-
     print("\nFurther help:")
     for k in _get_kind(CommandKind.FURTHER_HELP):
         print("  zen", k, {"help":"[command]"}.get(k, "").upper())
@@ -453,47 +461,59 @@ def do_help(args):
     return True
 
 def _todo_end():
+    #reserverd for end-marking
     pass
 
 
 ##========================
-## main init and entry
+## >P4: some implemations
 ##========================
 
+def _do_test():
+    print(__name__)
+
+
+##==========================
+## >P5: main init and entry
+##==========================
+
 def todo_init():
+    def _extract_name(token):
+        if token.type != tokenize.NAME or token.string != 'def' or token.start[1] != 0: return None
+        parts = token.line.split()
+        return parts[1].split("(")[0].strip() if len(parts) >= 2 else None
     def _extract_doc(text):
-        key, val, data = '"""', None, text.strip()
-        if data.startswith(key):
-            pp = data[len(key):]
-            val = pp[:len(pp)-len(key)].strip()
-        return val
+        key, data = '"""', text.strip()
+        if not data.startswith(key): return None
+        pp = data[len(key):]
+        return pp[:len(pp)-len(key)].strip()
+
+    # parse cmd docs
+    docs = []
     with tokenize.open(__file__) as f:
-        docs = []
         is_begin = False
-        tokens = tokenize.generate_tokens(f.readline)
-        for token in tokens:
-            if token.type == tokenize.STRING:
-                if not is_begin: continue
+        for token in tokenize.generate_tokens(f.readline):
+            name = _extract_name(token)
+            if name:
+                if name.startswith("_todo_begin"): is_begin = True
+                elif name.startswith("_todo_end"): break
+                elif name.startswith("do_"): docs.append(["def", name, token])
+            elif is_begin:
                 doc = _extract_doc(token.string)
                 if doc: docs.append(["doc", doc, token])
-            elif token.type == tokenize.NAME and token.string == 'def' and token.start[1] == 0:
-                parts = token.line.split()
-                if len(parts) < 2: continue
-                if parts[1].startswith("_todo_begin"): is_begin = True
-                elif parts[1].startswith("_todo_end"): break
-                elif parts[1].startswith("do_"):
-                    name = parts[1].split("(")[0]
-                    docs.append(["def", name, token])
-        last_item = None
-        for item in docs:
-            if last_item:
-                name, doc, key = None, None, None
-                if item[0] == "def" and last_item[0] == "doc" and last_item[2].start[1] == 0:
-                    name, doc, key = item[1], last_item[1], "detail"
-                elif item[0] == "doc" and last_item[0] == "def" and item[2].start[1] > 0:
-                    name, doc, key = last_item[1], item[1], "simple"
-                if name and doc and key: _add_cmd_prop(_parse_cmd(name), key, doc)
-            last_item = item
+        pass
+
+    # add docs to dict
+    last_item = None
+    for item in docs:
+        if last_item:
+            name, doc, key = None, None, None
+            if item[0] == "def" and last_item[0] == "doc" and last_item[2].start[1] == 0:
+                name, doc, key = item[1], last_item[1], "detail"
+            elif item[0] == "doc" and last_item[0] == "def" and item[2].start[1] > 0:
+                name, doc, key = last_item[1], item[1], "simple"
+            _add_cmd_prop(_parse_cmd(name), key, doc)
+        last_item = item
     pass
 
 if __name__ == '__main__':
@@ -501,12 +521,9 @@ if __name__ == '__main__':
     if len(sys.argv) < 2:
         do_help(None)
         sys.exit(0)
-    cmd = sys.argv[1]
-    val = _get_cmd(cmd)
-    #print(cmd, val, sys.argv[1:])
-    bret = False
-    if val: bret = val["func"](sys.argv[2:])
-    else:   print("Error: Unknown command: ", cmd, "\n")
+    cmd = _get_cmd(sys.argv[1])
+    bret = cmd["func"](sys.argv[2:]) if cmd else None
+    if bret is None: print("Error: Unknown command: ", sys.argv[1], "\n")
     iret = 0 if bret else 1
     sys.exit(iret)
 
