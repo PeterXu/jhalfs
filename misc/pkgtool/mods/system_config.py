@@ -1,16 +1,7 @@
 from res.etc_config import etc_adjtime
 from res.etc_config import etc_inputrc
 from res.etc_config import etc_shells
-
-# some tools
-def _write_lines(ppath, lines):
-    count = 0
-    with ppath.open("w") as fp:
-        for item in lines:
-            if count > 0: fp.write("\n")
-            fp.write(item)
-            count += 1
-    return count == len(lines)
+from mods.utils import Utils
 
 
 def todo_set_ip_or_dhcp(name, is_dhcp, addr=None, gw=None, dns=None, domains=None):
@@ -37,7 +28,7 @@ def todo_set_ip_or_dhcp(name, is_dhcp, addr=None, gw=None, dns=None, domains=Non
     else:
         lines.append("[Network]\nDHCP=ipv4")
         lines.append("[DHCPv4]\nUseDomains=true")
-    return _write_lines(netp, lines)
+    return Utils.write_lines(netp, lines)
 
 def todo_set_hosts(ADDR, FQDN, HOSTNAME, alias=[]):
     hostsp = Path("/etc/hosts")
@@ -60,7 +51,7 @@ def todo_set_hosts(ADDR, FQDN, HOSTNAME, alias=[]):
     lines.append("ff02::2   ip6-allrouters")
     lines.append("")
     lines.append("# End /etc/hosts")
-    return _write_lines(hostsp, lines)
+    return Utils.write_lines(hostsp, lines)
 
 def todo_set_adjtime():
     fpath = Path("/etc/adjtime")

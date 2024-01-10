@@ -8,6 +8,6 @@ $> pip3 install pyinstaller
 ## 2. Generate
 
 ```
-$> pyinstaller -c -F main.py
+$> pyinstaller -n zen -c -F main.py
 ```
 

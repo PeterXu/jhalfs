@@ -1,0 +1,39 @@
+Z_NAME = Man-DB
+Z_VER := $(Z_VER)
+
+define Z_DESC
+The Man-DB package contains programs for finding and viewing man pages.
+
+Installed programs:
+accessdb, apropos (link to whatis), catman, lexgrog, man, man-recode, mandb, manpath, and whatis
+Installed libraries:
+libman.so and libmandb.so (both in /usr/lib/man-db)
+Installed directories:
+/usr/lib/man-db, /usr/libexec/man-db, and /usr/share/doc/man-db-$(Z_VER)
+endef
+
+mkfile_dir := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+include $(mkfile_dir)common.mak
+
+
+desc: z_desc
+
+config: z_config
+	./configure --prefix=/usr                       \
+            --docdir=/usr/share/doc/man-db-$(Z_VER) \
+            --sysconfdir=/etc                     \
+            --disable-setuid                      \
+            --enable-cache-owner=bin              \
+            --with-browser=/usr/bin/lynx          \
+            --with-vgrind=/usr/bin/vgrind         \
+            --with-grap=/usr/bin/grap
+
+build: z_build
+	@make
+
+test: z_test
+	@make -k check
+
+install: z_install
+	@make install
+

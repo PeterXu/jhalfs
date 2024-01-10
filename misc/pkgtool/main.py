@@ -471,6 +471,7 @@ def _todo_end():
 
 import mods.system_config as syscfg
 from docs.parser import todo_parse_docs
+from repo.parser import todo_parse_repo
 try:
     from docs.generated import ALL_DOCS
 except:
@@ -486,7 +487,7 @@ def _do_init():
         _add_cmd_prop(_parse_cmd(name), key, doc)
     pass
 
-def _do_generate():
+def _do_gen_docs():
     try:
         items = todo_parse_docs(__file__)
     except:
@@ -503,13 +504,20 @@ def _do_generate():
         fp.write(']')
     pass
 
+def _do_gen_repo():
+    todo_parse_repo(None)
+    pass
+
 if __name__ == '__main__':
     _do_init()
     if len(sys.argv) < 2:
         do_help(None)
         sys.exit(0)
-    if sys.argv[1] == "generate":
-        _do_generate()
+    if sys.argv[1].startswith("gen-"):
+        if sys.argv[1] == "gen-docs":
+            _do_gen_docs()
+        elif sys.argv[1] == "gen-repo":
+            _do_gen_repo()
         sys.exit(0)
     cmd = _get_cmd(sys.argv[1])
     bret = cmd["func"](sys.argv[2:]) if cmd else None
