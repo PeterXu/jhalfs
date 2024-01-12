@@ -22,7 +22,19 @@ endef
 define Z_PREPARE
 echo "prepare begin"; \
 pwd; \
+cd /tmp/; \
+pwd; \
 uname -a; \
+echo $$PATH; \
+echo $$(gcc -dumpmachine); \
+echo $$; \
+echo 123 \
+	456 ; \
+case $$(uname -m) \
+in \
+  x86_64) echo 789; \
+;; \
+esac; \
 echo prepare end
 endef
 
@@ -42,8 +54,8 @@ endef
 define Z_INSTALL
 endef
 
-# step uninstall
-define Z_UNINSTALL
+# step unknown
+define Z_UNKNOWN
 endef
 
 

@@ -1,7 +1,7 @@
 import os
 import sys
 import time
-import urllib
+import random
 import tempfile
 from pathlib import Path
 from bs4 import BeautifulSoup
@@ -10,37 +10,49 @@ from mods.utils import Logger, Utils
 from repo.template import mak_template
 
 
-IS_TESTING = True
 DEFAULT_URL = "https://www.linuxfromscratch.org/lfs/view/stable/chapter08/chapter08.html"
-DEFAULT_PATH = "repo"
+BEGIN_HTMLS = ["introduction.html", "pkgmgt.html"]
+END_HTMLS = ["aboutdebug.html", "stripping.html", "cleanup.html"]
+
+def get_temp_dpath():
+    dpath = Path(tempfile.gettempdir()).joinpath(".zen_repo_0")
+    dpath.mkdir(exist_ok=True)
+    return dpath
+
+def get_make_fpath(name):
+    dpath = Path(os.path.realpath(os.curdir)).joinpath("repo/.data")
+    dpath.mkdir(exist_ok=True)
+    fpath = dpath.joinpath("Makefile.%s" % name.lower())
+    return fpath
+
 
 def todo_parse_repo(url):
-    fname = download_file(url)
+    if not url: url = DEFAULT_URL.strip()
+    fname, _ = download_file(url)
     if not fname: return False
     with open(fname) as f1:
         results = parse_toc(f1.read())
         for item in results:
-            sname = download_file(url, item[0])
+            sname, ret = download_file(url, item[0])
             if not sname: continue
             with open(sname) as f2:
                 ret = parse_detail(f2.read())
                 gen_makefile(item[1], ret)
-            break
+            if ret == 2:
+                time.sleep(random.choice([0.1, 0.3, 0.1]))
+            #break
     return True
 
 def download_file(url, name=None):
-    if IS_TESTING and not url: url = DEFAULT_URL.strip()
-    if not url: return None
-    dname = os.path.join(tempfile.gettempdir(), ".zen_repo_0")
-    os.makedirs(dname, exist_ok=True)
-
+    if not url: return None, -1
+    dname = get_temp_dpath()
     bname = name if name else os.path.basename(url)
     fname = os.path.join(dname, bname)
-    if not os.path.exists(fname):
-        furl = url
-        if name: furl = os.path.join(os.path.dirname(url), name)
-        fname = Utils.download_url(furl, dname)
-    return fname
+    if os.path.exists(fname): return fname, 1
+    furl = url
+    if name: furl = os.path.join(os.path.dirname(url), name)
+    fname = Utils.download_url(furl, dname)
+    return fname, 2
 
 #document.querySelectorAll("div.toc>ul>li>a")
 def parse_toc(html_doc):
@@ -50,8 +62,9 @@ def parse_toc(html_doc):
     for item in elements:
         link = item.get("href")
         if not link: continue
-        if link.endswith("introduction.html") or link.endswith("pkgmgt.html"):
-            continue
+        bname = os.path.basename(link)
+        if bname in BEGIN_HTMLS: continue
+        if bname in END_HTMLS: break
         #print(item, item.get("href"), item.text)
         results.append([link, item.text])
     return results
@@ -108,7 +121,6 @@ def parse_variablelist_items(element):
         parts = item.select("td>p")
         if not len(parts) == 2: continue
         left, right = parts[0].select_one("span>code"), parts[1]
-        #print(left, right)
         if left and right: results.append([left.text.strip(), right.text.strip()])
     return results
 
@@ -122,17 +134,17 @@ class Package(object):
     st_build    = ""
     st_test     = ""
     st_install  = ""
-    st_uninstall = ""
+    st_unknown  = ""
 
 def gen_makefile(name, info):
     if not info or len(info) != 3: return
     pkg = Package()
     pkg.name = name
     pos = name.rfind("-")
-    if pos > 0:
+    if pos > 0 and Utils.check_if_version(name[pos+1:]):
         pkg.name = name[:pos]
         pkg.version = name[pos+1:]
-        print(pkg.name, pkg.version)
+        #print(pkg.name, pkg.version)
 
     desc = []
     if info[0]:
@@ -146,16 +158,29 @@ def gen_makefile(name, info):
 
     if info[1]:
         data = {}
+        index = 0
+        states = ["prepare", "config", "build", "test", "install", "unknown"]
         for item in info[1]:
-            key = "prepare"
+            detail = item[0]
+            if not detail: detail = ""
+            detail = detail.replace("\n", "")
+            detail = detail.replace("\t", "")
+            detail = detail.replace(" ", "")
             if item[1].startswith("./configure") or item[1].startswith("../configure"):
-                key = "config"
+                index = 1
+            elif index <= 1 and detail.find("dedicatedbuilddirectory") > 0:
+                index = 1
             elif item[1].startswith("make"):
-                key = "build"
-                if item[1].find(" install") > 0: key = "install"
-                elif item[1].find(" check") > 0 or item[1].find(" test") > 0: key = "test"
+                if item[1].find(" install") > 0: index = 4
+                elif item[1].find(" check") > 0 or item[1].find(" test") > 0: index = 3
+                else: index += 1
+            line = Utils.update_make_oneline(item[1])
+            line = Utils.update_make_var(line)
+            #if pkg.name.lower() == "glibc": print(">>>", item)
+            if index >= len(states): index = len(states) - 1
+            key = states[index]
             val = data.get(key, [])
-            val.append(item[1])
+            val.append(line)
             data[key] = val
         sp = "; \\\n"
         #data["prepare"] = ["echo 123", "ls /tmp/", "echo 456", "ls /tmp/2"]
@@ -164,11 +189,10 @@ def gen_makefile(name, info):
         pkg.st_build =     sp.join(data.get("build", []))
         pkg.st_test =      sp.join(data.get("test", []))
         pkg.st_install =   sp.join(data.get("install", []))
-        pkg.st_uninstall = sp.join(data.get("uninstall", []))
+        pkg.st_unknown =   sp.join(data.get("unknown", []))
 
-    path = Path(os.path.realpath(os.curdir)).joinpath(DEFAULT_PATH)
-    fpath = path.joinpath("Makefile.%s" % pkg.name.lower())
     val = mak_template.format(pkg = pkg)
+    fpath = get_make_fpath(pkg.name)
     fpath.write_text(val)
     pass
 

@@ -47,9 +47,9 @@ define Z_INSTALL
 {pkg.st_install}
 endef
 
-# step uninstall
-define Z_UNINSTALL
-{pkg.st_uninstall}
+# step unknown
+define Z_UNKNOWN
+{pkg.st_unknown}
 endef
 
 

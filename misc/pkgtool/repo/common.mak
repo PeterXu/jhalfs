@@ -60,8 +60,8 @@ install:
 	@echo ">";$(Z_INSTALL)
 	@echo
 
-uninstall:
-	$(info ===== Install of $(Z_NAME)/$(Z_VER) =====)
-	@echo ">";$(Z_UNINSTALL)
+unknown:
+	$(info ===== Unknown of $(Z_NAME)/$(Z_VER) =====)
+	@echo ">";$(Z_UNKNOWN)
 	@echo
 
