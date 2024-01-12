@@ -35,9 +35,10 @@ def todo_parse_repo(url):
         for item in results:
             sname, ret = download_file(url, item[0])
             if not sname: continue
+            name = item[1].replace("::", "-")
             with open(sname) as f2:
-                ret = parse_detail(f2.read())
-                gen_makefile(item[1], ret)
+                ret = parse_detail(name, f2.read())
+                gen_makefile(name, ret)
             if ret == 2:
                 time.sleep(random.choice([0.1, 0.3, 0.1]))
             #break
@@ -72,14 +73,14 @@ def parse_toc(html_doc):
 #document.querySelector("div.wrap>div.package")
 #document.querySelectorAll("div.wrap>div.installation>pre.userinput>kbd.command")
 #document.querySelector("div.wrap>div.content")
-def parse_detail(html_doc):
+def parse_detail(name, html_doc):
     results = [None, None, None]
     soup = BeautifulSoup(html_doc, 'html.parser')
     package = soup.select_one("div.wrap>div.package")
     if package:
         p = package.select_one("p")
         desc = p.text.strip() if p else None
-        more = parse_segmentedlist_items(package)
+        more = parse_segmentedlist_items(name, package)
         #print(desc, more)
         results[0] = [desc, more]
 
@@ -99,13 +100,13 @@ def parse_detail(html_doc):
 
     content = soup.select_one("div.wrap>div.content")
     if content:
-        more = parse_segmentedlist_items(content)
-        items = parse_variablelist_items(content)
-        #print(more, items)
+        more = parse_segmentedlist_items(name, content)
+        items = parse_variablelist_items(name, content)
+        #if name.lower().startswith("acl"): print(more, items)
         results[2] = [more, items]
     return results
 
-def parse_segmentedlist_items(element):
+def parse_segmentedlist_items(name, element):
     results = []
     segs = element.select("div.segmentedlist>div.seglistitem>div.seg")
     for item in segs:
@@ -114,13 +115,14 @@ def parse_segmentedlist_items(element):
         if title and body: results.append(title.text.strip() + " " + body.text.strip())
     return results
 
-def parse_variablelist_items(element):
+def parse_variablelist_items(name, element):
     results = []
     items = element.select("div.variablelist>table>tbody>tr")
     for item in items:
         parts = item.select("td>p")
         if not len(parts) == 2: continue
-        left, right = parts[0].select_one("span>code"), parts[1]
+        left, right = parts[0].select_one("span"), parts[1]
+        #if name.lower().startswith("acl"): print(left.text)
         if left and right: results.append([left.text.strip(), right.text.strip()])
     return results
 
@@ -161,20 +163,26 @@ def gen_makefile(name, info):
         index = 0
         states = ["prepare", "config", "build", "test", "install", "unknown"]
         for item in info[1]:
-            detail = item[0]
+            detail, script = item
             if not detail: detail = ""
-            detail = detail.replace("\n", "")
-            detail = detail.replace("\t", "")
-            detail = detail.replace(" ", "")
-            if item[1].startswith("./configure") or item[1].startswith("../configure"):
+            if index == 2: index += 1
+            if script.find("./configure") >= 0:
                 index = 1
-            elif index <= 1 and detail.find("dedicatedbuilddirectory") > 0:
+            elif index <= 1 and script.startswith("mkdir ") and script.find("cd ") > 0:
                 index = 1
-            elif item[1].startswith("make"):
-                if item[1].find(" install") > 0: index = 4
-                elif item[1].find(" check") > 0 or item[1].find(" test") > 0: index = 3
+            elif detail.startswith("Prepare ") and index < 1: index = 1 #xml-parser
+            elif script.startswith("make"):
+                if script == "make": index = 2
+                elif script.find(" install") > 0: index = 4
+                elif script.find(" check") > 0 or script.find(" test") > 0: index = 3
                 else: index += 1
-            line = Utils.update_make_oneline(item[1])
+            elif script.startswith("pip3 wheel"): index = 2
+            elif script.startswith("pip3 install"): index = 4
+            elif detail.find("sanity checks") > 0:
+                if index >= 4: index = 5
+            elif script.startswith("exec /usr/bin/bash --login"): #bash
+                index += 1
+            line = Utils.update_make_oneline(script)
             line = Utils.update_make_var(line)
             #if pkg.name.lower() == "glibc": print(">>>", item)
             if index >= len(states): index = len(states) - 1
