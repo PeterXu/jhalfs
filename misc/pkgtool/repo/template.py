@@ -2,7 +2,7 @@
 #.format(name=, version=, desc=, config=, build=, test=, install=)
 mak_template = """#zen-makefile template
 # package name: could be set from external-env
-__NAME = {name}
+__NAME = {pkg.name}
 ifeq ($(strip $(__NAME)),)
 Z_NAME := $(Z_NAME)
 else
@@ -10,7 +10,7 @@ Z_NAME = $(__NAME)
 endif
 
 # package version: could be set from external-env
-__VER = {version}
+__VER = {pkg.version}
 ifeq ($(strip $(__VER)),)
 Z_VER := $(Z_VER)
 else
@@ -19,25 +19,40 @@ endif
 
 # package description
 define Z_DESC
-{desc}
+{pkg.desc}
 endef
+
+# step prepare
+define Z_PREPARE
+{pkg.st_prepare}
+endef
+
+# step config
+define Z_CONFIG
+{pkg.st_config}
+endef
+
+# step build
+define Z_BUILD
+{pkg.st_build}
+endef
+
+# step test
+define Z_TEST
+{pkg.st_test}
+endef
+
+# step install
+define Z_INSTALL
+{pkg.st_install}
+endef
+
+# step uninstall
+define Z_UNINSTALL
+{pkg.st_uninstall}
+endef
+
 
 mkfile_dir := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 include $(mkfile_dir)common.mak
-
-
-desc: z_desc
-
-config: z_config
-	{config}
-
-build: z_build
-	{build}
-
-test: z_test
-	{test}
-
-install: z_install
-	{install}
-
 """

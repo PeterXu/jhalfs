@@ -18,17 +18,34 @@ endif
 define Z_DESC
 endef
 
+# step prepare
+define Z_PREPARE
+echo "prepare begin"; \
+pwd; \
+uname -a; \
+echo prepare end
+endef
+
+# step config
+define Z_CONFIG
+endef
+
+# step build
+define Z_BUILD
+endef
+
+# step test
+define Z_TEST
+endef
+
+# step install
+define Z_INSTALL
+endef
+
+# step uninstall
+define Z_UNINSTALL
+endef
+
+
 mkfile_dir := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 include $(mkfile_dir)common.mak
-
-
-desc: z_desc
-
-config: z_config
-
-build: z_build
-
-test: z_test
-
-install: z_install
-

@@ -112,21 +112,40 @@ def parse_variablelist_items(element):
         if left and right: results.append([left.text.strip(), right.text.strip()])
     return results
 
+
+class Package(object):
+    name    = ""
+    version = ""
+    desc    = ""
+    st_prepare  = ""
+    st_config   = ""
+    st_build    = ""
+    st_test     = ""
+    st_install  = ""
+    st_uninstall = ""
+
 def gen_makefile(name, info):
     if not info or len(info) != 3: return
-    data = {
-        "desc": [],
-        "prepare": [],
-        "config": [],
-        "build": [],
-        "test": [],
-        "install": [],
-    }
+    pkg = Package()
+    pkg.name = name
+    pos = name.rfind("-")
+    if pos > 0:
+        pkg.name = name[:pos]
+        pkg.version = name[pos+1:]
+        print(pkg.name, pkg.version)
+
+    desc = []
     if info[0]:
-        desc = [info[0][0]]
+        desc = [info[0][0], ""]
         desc.extend(info[0][1])
-        data["desc"] = desc
+    if info[2]:
+        more, items = info[2]
+        desc.extend(more)
+        for item in items: desc.append(": ".join(item))
+    pkg.desc = "\n".join(desc)
+
     if info[1]:
+        data = {}
         for item in info[1]:
             key = "prepare"
             if item[1].startswith("./configure") or item[1].startswith("../configure"):
@@ -135,17 +154,21 @@ def gen_makefile(name, info):
                 key = "build"
                 if item[1].find(" install") > 0: key = "install"
                 elif item[1].find(" check") > 0 or item[1].find(" test") > 0: key = "test"
-            data[key].append(item[1])
+            val = data.get(key, [])
+            val.append(item[1])
+            data[key] = val
+        sp = "; \\\n"
+        #data["prepare"] = ["echo 123", "ls /tmp/", "echo 456", "ls /tmp/2"]
+        pkg.st_prepare =   sp.join(data.get("prepare", []))
+        pkg.st_config =    sp.join(data.get("config", []))
+        pkg.st_build =     sp.join(data.get("build", []))
+        pkg.st_test =      sp.join(data.get("test", []))
+        pkg.st_install =   sp.join(data.get("install", []))
+        pkg.st_uninstall = sp.join(data.get("uninstall", []))
+
     path = Path(os.path.realpath(os.curdir)).joinpath(DEFAULT_PATH)
-    fpath = path.joinpath("Makefile")
-    print(path, name)
-    #print(info)
-    print(data)
-    desc = "\n".join(data["desc"])
-    config = "\n".join(data["config"])
-    build = "\n".join(data["build"])
-    test = "\n".join(data["test"])
-    install = "\n".join(data["install"])
-    val = mak_template.format(name=name, version="", desc=desc, config=config, build=build, test=test, install=install)
+    fpath = path.joinpath("Makefile.%s" % pkg.name.lower())
+    val = mak_template.format(pkg = pkg)
     fpath.write_text(val)
     pass
+

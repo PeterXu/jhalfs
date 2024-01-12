@@ -21,34 +21,47 @@ endif
 # check detected version
 _BN_VER = $(shell basename $(CURDIR) | cut -d '-' -f2)
 ifeq ($(_BN_VER),$(shell basename $(CURDIR)))
-_BN_VER = NO-VERSION
+_BN_VER = $(Z_VER)
 endif
 ifneq ($(Z_VER),$(_BN_VER))
 $(warning Maybe different versions <$(Z_VER) vs. $(_BN_VER)>???)
 endif
 
 
-z_none:
+none:
 	@echo
 
-z_desc:
+desc:
 	$(info ===== Description of $(Z_NAME)/$(Z_VER) =====)
 	$(info $(Z_DESC))
 	@echo
 
-z_config:
+prepare:
+	$(info ===== Prepare of $(Z_NAME)/$(Z_VER) =====)
+	@echo ">";$(Z_PREPARE)
+
+config:
 	$(info ===== Config of $(Z_NAME)/$(Z_VER) =====)
+	@echo ">";$(Z_CONFIG)
 	@echo
 
-z_build:
+build:
 	$(info ===== Build of $(Z_NAME)/$(Z_VER) =====)
+	@echo ">";$(Z_BUILD)
 	@echo
 
-z_test:
+test:
 	$(info ===== Test of $(Z_NAME)/$(Z_VER) =====)
+	@echo ">";$(Z_TEST)
 	@echo
 
-z_install:
+install:
 	$(info ===== Install of $(Z_NAME)/$(Z_VER) =====)
+	@echo ">";$(Z_INSTALL)
+	@echo
+
+uninstall:
+	$(info ===== Install of $(Z_NAME)/$(Z_VER) =====)
+	@echo ">";$(Z_UNINSTALL)
 	@echo
 
