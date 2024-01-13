@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+import enum
 import random
 import tempfile
 from pathlib import Path
@@ -26,6 +27,7 @@ def get_make_fpath(name):
     return fpath
 
 
+# basic system softs
 def todo_parse_repo(url):
     if not url: url = DEFAULT_URL.strip()
     fname, _ = download_file(url)
@@ -35,10 +37,10 @@ def todo_parse_repo(url):
         for item in results:
             sname, ret = download_file(url, item[0])
             if not sname: continue
-            name = item[1].replace("::", "-")
+            name = item[1]
             with open(sname) as f2:
-                ret = parse_detail(name, f2.read())
-                gen_makefile(name, ret)
+                data = parse_detail(name, f2.read())
+                gen_makefile(name, data)
             if ret == 2:
                 time.sleep(random.choice([0.1, 0.3, 0.1]))
             #break
@@ -70,40 +72,83 @@ def parse_toc(html_doc):
         results.append([link, item.text])
     return results
 
-#document.querySelector("div.wrap>div.package")
-#document.querySelectorAll("div.wrap>div.installation>pre.userinput>kbd.command")
-#document.querySelector("div.wrap>div.content")
+#document.querySelector("body.lfs>div>div.package")
+#document.querySelector("body.blfs>div>div.package")
+#document.querySelectorAll("div>div.installation>pre.userinput>kbd.command")
+#document.querySelector("div>div.content")
 def parse_detail(name, html_doc):
-    results = [None, None, None]
+    results = {}
     soup = BeautifulSoup(html_doc, 'html.parser')
-    package = soup.select_one("div.wrap>div.package")
-    if package:
+    kind = "lfs"
+    if not soup.select_one("body.lfs"):
+        kind = "blfs"
+        if not soup.select_one("body.blfs"): return False
+
+    # A. parse <div.package>: basic info
+    data = []
+    package = soup.select_one("body.%s>div>div.package" % kind)
+    if not package: return False
+    if kind == "lfs":
         p = package.select_one("p")
-        desc = p.text.strip() if p else None
-        more = parse_segmentedlist_items(name, package)
-        #print(desc, more)
-        results[0] = [desc, more]
+        data = [p.text.strip() if p else "Unknown", ""]
+        items = parse_segmentedlist_items(name, package)
+        data.extend(items)
+    else:
+        ptr = None
+        hintro, hinfo, hdeps  = [], [], []
+        for e in package.select("*"):
+            if e.name == "h2": ptr = hintro
+            elif e.name == "p": pass
+            elif e.name == "h3":
+                text = e.text.rstrip()
+                if text.endswith("Package Information"): ptr = hinfo
+                elif text.endswith("Dependencie"): ptr = hdeps
+            elif e.name == "div":
+                for i in e.select("ul.compact>li.listitem"):
+                    if ptr: ptr.append(i.text)
+                e = None
+            elif e.name == "h4": pass
+            if ptr and e: ptr.append(e.text)
+        data.extend(hintro)
+        data.extend(hinfo)
+        data.extend(hdeps)
+    results["h_info"] = data
 
-    installation = soup.select_one("div.wrap>div.installation")
+    # B. parse <div.installation>: build/install
+    data = []
+    installation = soup.select_one("body.%s>div>div.installation" % kind)
     if installation:
-        steps = []
         last_p = None
-        elements = installation.find_all(recursive=False)
-        for item in elements:
-            if item.name == "pre":
-                cmd = item.select_one("kbd.command")
-                if cmd: steps.append([last_p, cmd.text.strip()])
+        for e in installation.find_all(recursive=False):
+            if e.name == "pre":
+                cmd = e.select_one("kbd.command")
+                if cmd: data.append([last_p, cmd.text.strip()])
                 last_p = None
-            elif item.name == "p": last_p = item.text.strip()
-        #print (len(steps), steps)
-        results[1] = steps
+            elif e.name == "p": last_p = e.text.strip()
+    results["h_install"] = data
 
-    content = soup.select_one("div.wrap>div.content")
+    # C. parse <div.configuration>: post-install config
+    data = []
+    configuration = soup.select("body.%s>div>div.configuration" % kind)
+    for config in configuration:
+        lines = []
+        for e in config.find_all(recursive=False):
+            if e.name in ["h2", "p"]: lines.append(e.text)
+            elif e.name == "pre":
+                lines.append("<code>\n%s\n<code>" % e.text)
+            elif e.name == "div": pass
+            data.append(lines)
+    results["h_config"] = data
+
+    # D. parse <div.content>: post-install content
+    data = []
+    content = soup.select_one("body.%s>div>div.content" % kind)
     if content:
-        more = parse_segmentedlist_items(name, content)
-        items = parse_variablelist_items(name, content)
-        #if name.lower().startswith("acl"): print(more, items)
-        results[2] = [more, items]
+        items1 = parse_segmentedlist_items(name, content)
+        items2 = parse_variablelist_items(name, content)
+        data = [items1, items2]
+        #if name.lower().startswith("acl"): print(data)
+    results["h_content"] = data
     return results
 
 def parse_segmentedlist_items(name, element):
@@ -127,80 +172,124 @@ def parse_variablelist_items(name, element):
     return results
 
 
+@enum.unique
+class StepInstall(enum.IntEnum):
+    PREPROC     = enum.auto()
+    CONFIG      = enum.auto()
+    BUILD       = enum.auto()
+    TEST        = enum.auto()
+    INSTALL     = enum.auto()
+    POSTPROC    = enum.auto()
+    UNKNOWN     = enum.auto()
+    END         = enum.auto()
+
 class Package(object):
     name    = ""
     version = ""
     desc    = ""
-    st_prepare  = ""
-    st_config   = ""
-    st_build    = ""
-    st_test     = ""
-    st_install  = ""
-    st_unknown  = ""
+    scripts = {}
 
-def gen_makefile(name, info):
-    if not info or len(info) != 3: return
+def gen_makefile(name, data):
+    if not name or not data:
+        return False
+    name = name.split()[0]
+
     pkg = Package()
     pkg.name = name
     pos = name.rfind("-")
     if pos > 0 and Utils.check_if_version(name[pos+1:]):
         pkg.name = name[:pos]
         pkg.version = name[pos+1:]
-        #print(pkg.name, pkg.version)
+    name = pkg.name
+    pkg.name = pkg.name.replace("::", "-")
+    #print(name, pkg.name, pkg.version)
 
-    desc = []
-    if info[0]:
-        desc = [info[0][0], ""]
-        desc.extend(info[0][1])
-    if info[2]:
-        more, items = info[2]
-        desc.extend(more)
-        for item in items: desc.append(": ".join(item))
-    pkg.desc = "\n".join(desc)
+    info = data.get("h_info", [])
+    content = data.get("h_content", [])
+    if content:
+        info.append("")
+        info.extend(content[0])
+        for item in content[1]: info.append(": ".join(item))
+    pkg.desc = "\n".join(info)
 
-    if info[1]:
-        data = {}
-        index = 0
-        states = ["prepare", "config", "build", "test", "install", "unknown"]
-        for item in info[1]:
+    install = data.get("h_install", [])
+    if install:
+        rets = {}
+        index = StepInstall.PREPROC
+        subdir_script = None
+        for item in install:
             detail, script = item
             if not detail: detail = ""
-            if index == 2: index += 1
-            if script.find("./configure") >= 0:
-                index = 1
-            elif index <= 1 and script.startswith("mkdir ") and script.find("cd ") > 0:
-                index = 1
-            elif detail.startswith("Prepare ") and index < 1: index = 1 #xml-parser
-            elif script.startswith("make"):
-                if script == "make": index = 2
-                elif script.find(" install") > 0: index = 4
-                elif script.find(" check") > 0 or script.find(" test") > 0: index = 3
-                else: index += 1
-            elif script.startswith("pip3 wheel"): index = 2
-            elif script.startswith("pip3 install"): index = 4
-            elif detail.find("sanity checks") > 0:
-                if index >= 4: index = 5
-            elif script.startswith("exec /usr/bin/bash --login"): #bash
-                index += 1
+            detail = Utils.replace_all_spaces(detail, "_").lower()
+
+            have_subdir = False
+            for i in [0]:
+                #>config
+                k = index - 1
+                if detail.startswith("prepare_%s_for_compilation" % name.lower()):
+                    k = StepInstall.CONFIG #gcc/glibc/xml-parser
+                elif detail.find("dedicated_build_directory") != -1:
+                    k = StepInstall.CONFIG #gcc/glibc
+                    have_subdir = True
+                elif detail.find("built_in_a_subdirectory") != -1:
+                    k = StepInstall.CONFIG #e2fsprogs
+                    have_subdir = True
+                if k >= index: index = k; break
+                have_subdir = False
+                #>build
+                k = index - 1
+                if detail.startswith("compile_the_package"):
+                    k = StepInstall.BUILD  #gcc/glibc/xml-parser
+                elif detail.startswith("compile_%s" % name.lower()):
+                    k = StepInstall.BUILD  #wheel/meson/markupsafe/flit-core
+                elif detail.startswith("build_the_package"):
+                    k = StepInstall.BUILD  #jinja2
+                elif detail.startswith("build_%s" % name.lower()):
+                    k = StepInstall.BUILD
+                elif detail.startswith("build_and_install_the_package"):
+                    k = StepInstall.BUILD #dejagnu
+                if k >= index: index = k; break
+                #>test
+                k = index - 1
+                if detail.find("_tests_") != -1 or detail.startswith("to_test_the") or detail.startswith("test_the"):
+                    k = StepInstall.TEST #binutils
+                if k >= index: index = k; break
+                #>install
+                k = index - 1
+                if detail.startswith("install_the_package"):
+                    index = StepInstall.INSTALL #jinja2/meson/markupsafe/flit-core/gcc/..
+                elif detail.startswith("install_%s" % name.lower()):
+                    index = StepInstall.INSTALL #wheel
+                if k >= index: index = k; break
+                #>postproc
+                k = index - 1
+                if detail.find("sanity_checks") != -1:
+                    index = StepInstall.POSTPROC #gcc
+                if k >= index: index = k; break
+                #>others...
+                if detail.startswith("run_the_newly_compiled"):
+                    index += 1 #bash
+            #if name.lower() == "xml::parser": print(item[0], index, detail)
             line = Utils.update_make_oneline(script)
             line = Utils.update_make_var(line)
-            #if pkg.name.lower() == "glibc": print(">>>", item)
-            if index >= len(states): index = len(states) - 1
-            key = states[index]
-            val = data.get(key, [])
+            if have_subdir: subdir_script = line
+            if index >= StepInstall.END: index = StepInstall.UNKNOWN
+            key = StepInstall(index)
+            val = rets.get(key, [])
             val.append(line)
-            data[key] = val
+            rets[key] = val
         sp = "; \\\n"
-        #data["prepare"] = ["echo 123", "ls /tmp/", "echo 456", "ls /tmp/2"]
-        pkg.st_prepare =   sp.join(data.get("prepare", []))
-        pkg.st_config =    sp.join(data.get("config", []))
-        pkg.st_build =     sp.join(data.get("build", []))
-        pkg.st_test =      sp.join(data.get("test", []))
-        pkg.st_install =   sp.join(data.get("install", []))
-        pkg.st_unknown =   sp.join(data.get("unknown", []))
+        for key in StepInstall:
+            val = rets.get(key, [])
+            lines = []
+            if val and key > StepInstall.CONFIG and subdir_script:
+                lines.append(subdir_script)
+            lines.extend(val)
+            pkg.scripts[key.name.lower()] = sp.join(lines)
+        pass
 
-    val = mak_template.format(pkg = pkg)
+    mdata = mak_template.format(pkg = pkg)
     fpath = get_make_fpath(pkg.name)
-    fpath.write_text(val)
-    pass
+    fpath.write_text(mdata)
+    return True
 

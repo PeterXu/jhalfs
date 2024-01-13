@@ -1,5 +1,6 @@
 import os
 import sys
+import re
 import urllib
 from urllib import request, error
 from pathlib import Path
@@ -19,6 +20,21 @@ class Logger:
 
 
 class Utils:
+    @classmethod
+    def replace_all_spaces(cls, val, pat=""):
+        if type(val) != type(""): return val
+        new = re.sub(r"\s+", pat, val)
+        return new
+
+    @classmethod
+    def replace_all_nonwords(cls, val, pat=""):
+        if type(val) != type(""): return val
+        # Remove all non-word characters (except numbers and letters)
+        new = re.sub(r"[^\w\s]", '', val)
+        # Replace with pat
+        new = re.sub(r"\s+", pat, new)
+        return new
+
     @classmethod
     def check_if_version(cls, val):
         if type(val) != type(""): return False

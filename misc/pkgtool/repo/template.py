@@ -22,34 +22,39 @@ define Z_DESC
 {pkg.desc}
 endef
 
-# step prepare
-define Z_PREPARE
-{pkg.st_prepare}
+# step preproc
+define Z_PREPROC
+{pkg.scripts[preproc]}
 endef
 
 # step config
 define Z_CONFIG
-{pkg.st_config}
+{pkg.scripts[config]}
 endef
 
 # step build
 define Z_BUILD
-{pkg.st_build}
+{pkg.scripts[build]}
 endef
 
 # step test
 define Z_TEST
-{pkg.st_test}
+{pkg.scripts[test]}
 endef
 
 # step install
 define Z_INSTALL
-{pkg.st_install}
+{pkg.scripts[install]}
+endef
+
+# step postproc
+define Z_POSTPROC
+{pkg.scripts[postproc]}
 endef
 
 # step unknown
 define Z_UNKNOWN
-{pkg.st_unknown}
+{pkg.scripts[unknown]}
 endef
 
 

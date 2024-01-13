@@ -29,6 +29,7 @@ endif
 
 
 none:
+	@echo "targets: preproc|config|build|test|install|postproc|unknown"
 	@echo
 
 desc:
@@ -36,9 +37,9 @@ desc:
 	$(info $(Z_DESC))
 	@echo
 
-prepare:
-	$(info ===== Prepare of $(Z_NAME)/$(Z_VER) =====)
-	@echo ">";$(Z_PREPARE)
+preproc:
+	$(info ===== PreProc of $(Z_NAME)/$(Z_VER) =====)
+	@echo ">";$(Z_PREPROC)
 
 config:
 	$(info ===== Config of $(Z_NAME)/$(Z_VER) =====)
@@ -58,6 +59,11 @@ test:
 install:
 	$(info ===== Install of $(Z_NAME)/$(Z_VER) =====)
 	@echo ">";$(Z_INSTALL)
+	@echo
+
+postproc:
+	$(info ===== PostProc of $(Z_NAME)/$(Z_VER) =====)
+	@echo ">";$(Z_POSTPROC)
 	@echo
 
 unknown:

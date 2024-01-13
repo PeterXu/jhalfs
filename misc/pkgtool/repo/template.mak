@@ -18,9 +18,9 @@ endif
 define Z_DESC
 endef
 
-# step prepare
-define Z_PREPARE
-echo "prepare begin"; \
+# step preproc
+define Z_PREPROC
+echo "preproc begin"; \
 pwd; \
 cd /tmp/; \
 pwd; \
@@ -35,7 +35,7 @@ in \
   x86_64) echo 789; \
 ;; \
 esac; \
-echo prepare end
+echo preproc end
 endef
 
 # step config
@@ -52,6 +52,10 @@ endef
 
 # step install
 define Z_INSTALL
+endef
+
+# step post-proc
+define Z_POSTPROC
 endef
 
 # step unknown
