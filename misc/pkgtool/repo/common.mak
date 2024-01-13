@@ -13,8 +13,8 @@ Z_VER = NO-VERSION
 endif
 endif
 
-ifeq ($(strip $(Z_DESC)),)
-Z_DESC = The Package <$(Z_NAME)> ...
+ifeq ($(strip $(ZP_INTRO)),)
+ZP_INTRO = The Package <$(Z_NAME)> ...
 endif
 
 
@@ -29,45 +29,99 @@ endif
 
 
 none:
-	@echo "targets: preproc|config|build|test|install|postproc|unknown"
+	@echo "===== Package $(Z_NAME)/$(Z_VER) ====="
+	@echo "Description targets: intro|info|deps|content"
+	@echo "Compiling targets:   preproc|config|build|test|install|postproc|unknown"
 	@echo
 
-desc:
-	$(info ===== Description of $(Z_NAME)/$(Z_VER) =====)
-	$(info $(Z_DESC))
+#==================================================
+
+intro:
+	$(info ===== Package-Introduction of $(Z_NAME)/$(Z_VER) =====)
+	$(info $(ZP_INTRO))
 	@echo
+
+info:
+	$(info ===== Package-Infomation of $(Z_NAME)/$(Z_VER) =====)
+	$(info $(ZP_INFO))
+	@echo
+
+deps:
+	$(info ===== Package-Dependencies of $(Z_NAME)/$(Z_VER) =====)
+	$(info $(ZP_DEPS))
+	@echo
+
+content:
+	$(info ===== Package-Content of $(Z_NAME)/$(Z_VER) =====)
+	$(info $(ZP_CONTENT))
+	@echo
+
+#==================================================
+
+define crlf
+
+
+endef
 
 preproc:
 	$(info ===== PreProc of $(Z_NAME)/$(Z_VER) =====)
-	@echo ">";$(Z_PREPROC)
+ifeq ($(Z_EXEC),1)
+	@echo ">";$(ZS_PREPROC)
+else
+	$(info $(subst ; ,$(crlf),$(ZS_PREPROC)))
+endif
+	@echo
 
 config:
 	$(info ===== Config of $(Z_NAME)/$(Z_VER) =====)
-	@echo ">";$(Z_CONFIG)
-	@echo
+ifeq ($(Z_EXEC),1)
+	@echo ">";$(ZS_CONFIG)
+else
+	$(info $(subst ; ,$(crlf),$(ZS_CONFIG)))
+endif
 
 build:
 	$(info ===== Build of $(Z_NAME)/$(Z_VER) =====)
-	@echo ">";$(Z_BUILD)
+ifeq ($(Z_EXEC),1)
+	@echo ">";$(ZS_BUILD)
+else
+	$(info $(subst ; ,$(crlf),$(ZS_BUILD)))
+endif
 	@echo
 
 test:
 	$(info ===== Test of $(Z_NAME)/$(Z_VER) =====)
-	@echo ">";$(Z_TEST)
+ifeq ($(Z_EXEC),1)
+	@echo ">";$(ZS_TEST)
+else
+	$(info $(subst ; ,$(crlf),$(ZS_TEST)))
+endif
 	@echo
 
 install:
 	$(info ===== Install of $(Z_NAME)/$(Z_VER) =====)
-	@echo ">";$(Z_INSTALL)
+ifeq ($(Z_EXEC),1)
+	@echo ">";$(ZS_INSTALL)
+else
+	$(info $(subst ; ,$(crlf),$(ZS_INSTALL)))
+endif
 	@echo
 
 postproc:
 	$(info ===== PostProc of $(Z_NAME)/$(Z_VER) =====)
-	@echo ">";$(Z_POSTPROC)
+ifeq ($(Z_EXEC),1)
+	@echo ">";$(ZS_POSTPROC)
+else
+	$(info $(subst ; ,$(crlf),$(ZS_POSTPROC)))
+endif
 	@echo
 
 unknown:
 	$(info ===== Unknown of $(Z_NAME)/$(Z_VER) =====)
-	@echo ">";$(Z_UNKNOWN)
+ifeq ($(Z_EXEC),1)
+	@echo ">";$(ZS_UNKNOWN)
+else
+	$(info $(subst ; ,$(crlf),$(ZS_UNKNOWN)))
+endif
 	@echo
 

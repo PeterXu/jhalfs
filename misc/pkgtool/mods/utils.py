@@ -5,6 +5,20 @@ import urllib
 from urllib import request, error
 from pathlib import Path
 
+#default without attr, but could add new.
+class EmptyObject(object):
+    def __getattr__(self, name):
+        return None
+    def setattr(self, name, value):
+        self.__dict__[name] = value
+    def setattrs(self, dt):
+        for k, v in dt.items(): self.setattr(k, v)
+    def items(self):
+        return self.__dict__.items()
+    def size(self):
+        return len(self.__dict__)
+
+
 class Logger:
     @classmethod
     def i(cls, *args, **kwargs):
@@ -105,4 +119,5 @@ class Utils:
         except Exception as ex:
             Logger.w("Download failed with exception: ", ex)
         return False
+
 

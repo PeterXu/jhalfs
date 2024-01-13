@@ -14,12 +14,28 @@ else
 Z_VER = $(__VER)
 endif
 
-# package description
-define Z_DESC
+#====================
+
+# package introduction
+define ZP_INTRO
 endef
 
+# package infomation
+define ZP_INFO
+endef
+
+# package dependencies
+define ZP_DEPS
+endef
+
+# package contents
+define ZP_CONTENT
+endef
+
+#====================
+
 # step preproc
-define Z_PREPROC
+define ZS_PREPROC
 echo "preproc begin"; \
 pwd; \
 cd /tmp/; \
@@ -39,29 +55,30 @@ echo preproc end
 endef
 
 # step config
-define Z_CONFIG
+define ZS_CONFIG
 endef
 
 # step build
-define Z_BUILD
+define ZS_BUILD
 endef
 
 # step test
-define Z_TEST
+define ZS_TEST
 endef
 
 # step install
-define Z_INSTALL
+define ZS_INSTALL
 endef
 
-# step post-proc
-define Z_POSTPROC
+# step postproc
+define ZS_POSTPROC
 endef
 
 # step unknown
-define Z_UNKNOWN
+define ZS_UNKNOWN
 endef
 
+#====================
 
 mkfile_dir := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 include $(mkfile_dir)common.mak

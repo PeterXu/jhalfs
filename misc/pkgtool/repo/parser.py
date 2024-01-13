@@ -7,13 +7,10 @@ import tempfile
 from pathlib import Path
 from bs4 import BeautifulSoup
 
-from mods.utils import Logger, Utils
+from mods.utils import Logger, Utils, EmptyObject
 from repo.template import mak_template
+from repo.db import get_repo_db
 
-
-DEFAULT_URL = "https://www.linuxfromscratch.org/lfs/view/stable/chapter08/chapter08.html"
-BEGIN_HTMLS = ["introduction.html", "pkgmgt.html"]
-END_HTMLS = ["aboutdebug.html", "stripping.html", "cleanup.html"]
 
 def get_temp_dpath():
     dpath = Path(tempfile.gettempdir()).joinpath(".zen_repo_0")
@@ -27,9 +24,14 @@ def get_make_fpath(name):
     return fpath
 
 
-# basic system softs
-def todo_parse_repo(url):
-    if not url: url = DEFAULT_URL.strip()
+def todo_parse_repo(kind):
+    db = get_repo_db(kind)
+    for item in db.items:
+        url = os.path.join(db.root, item.uri)
+        parse_one_url(url)
+    pass
+
+def parse_one_url(url):
     fname, _ = download_file(url)
     if not fname: return False
     with open(fname) as f1:
@@ -65,9 +67,14 @@ def parse_toc(html_doc):
     for item in elements:
         link = item.get("href")
         if not link: continue
+        tname = item.text.strip()
+        pos = tname.rfind("-")
+        if pos < 0 or not Utils.check_if_version(tname[pos+1:]):
+            Logger.w("skip link:", link)
+            continue
         bname = os.path.basename(link)
-        if bname in BEGIN_HTMLS: continue
-        if bname in END_HTMLS: break
+        #if bname in repo.start_uris: continue
+        #if bname in repo.stop_uris: break
         #print(item, item.get("href"), item.text)
         results.append([link, item.text])
     return results
@@ -90,9 +97,9 @@ def parse_detail(name, html_doc):
     if not package: return False
     if kind == "lfs":
         p = package.select_one("p")
-        data = [p.text.strip() if p else "Unknown", ""]
-        items = parse_segmentedlist_items(name, package)
-        data.extend(items)
+        hintro = [p.text.strip() if p else "Unknown"]
+        hinfo = parse_segmentedlist_items(name, package)
+        data = [hintro, hinfo, []]
     else:
         ptr = None
         hintro, hinfo, hdeps  = [], [], []
@@ -109,10 +116,8 @@ def parse_detail(name, html_doc):
                 e = None
             elif e.name == "h4": pass
             if ptr and e: ptr.append(e.text)
-        data.extend(hintro)
-        data.extend(hinfo)
-        data.extend(hdeps)
-    results["h_info"] = data
+        data = [hintro, hinfo, hdeps]
+    results["h_package"] = data
 
     # B. parse <div.installation>: build/install
     data = []
@@ -183,10 +188,10 @@ class StepInstall(enum.IntEnum):
     UNKNOWN     = enum.auto()
     END         = enum.auto()
 
-class Package(object):
+class MakDetail(object):
     name    = ""
     version = ""
-    desc    = ""
+    package = {}
     scripts = {}
 
 def gen_makefile(name, data):
@@ -194,29 +199,32 @@ def gen_makefile(name, data):
         return False
     name = name.split()[0]
 
-    pkg = Package()
-    pkg.name = name
+    mak = MakDetail()
+    mak.name = name
     pos = name.rfind("-")
     if pos > 0 and Utils.check_if_version(name[pos+1:]):
-        pkg.name = name[:pos]
-        pkg.version = name[pos+1:]
-    name = pkg.name
-    pkg.name = pkg.name.replace("::", "-")
-    #print(name, pkg.name, pkg.version)
+        mak.name = name[:pos]
+        mak.version = name[pos+1:]
+    name = mak.name
+    mak.name = mak.name.replace("::", "-")
+    #print(name, mak.name, mak.version)
 
-    info = data.get("h_info", [])
-    content = data.get("h_content", [])
-    if content:
-        info.append("")
-        info.extend(content[0])
-        for item in content[1]: info.append(": ".join(item))
-    pkg.desc = "\n".join(info)
+    package = data.get("h_package", [[], [], []])
+    mak.package["intro"] = "\n".join(package[0])
+    mak.package["info"] = "\n".join(package[1])
+    mak.package["deps"] = "\n".join(package[2])
 
+    rets = []
+    content = data.get("h_content", [[], []])
+    rets.extend(content[0])
+    for item in content[1]: rets.append(": ".join(item))
+    mak.package["content"] = "\n".join(rets)
+
+    rets = {}
+    subdir_script = None
     install = data.get("h_install", [])
     if install:
-        rets = {}
         index = StepInstall.PREPROC
-        subdir_script = None
         for item in install:
             detail, script = item
             if not detail: detail = ""
@@ -278,18 +286,19 @@ def gen_makefile(name, data):
             val = rets.get(key, [])
             val.append(line)
             rets[key] = val
-        sp = "; \\\n"
-        for key in StepInstall:
-            val = rets.get(key, [])
-            lines = []
-            if val and key > StepInstall.CONFIG and subdir_script:
-                lines.append(subdir_script)
-            lines.extend(val)
-            pkg.scripts[key.name.lower()] = sp.join(lines)
         pass
+    sp = "; \\\n"
+    for key in StepInstall:
+        val = rets.get(key, [])
+        lines = []
+        if val and key > StepInstall.CONFIG and subdir_script:
+            lines.append(subdir_script)
+        lines.extend(val)
+        mak.scripts[key.name.lower()] = sp.join(lines)
 
-    mdata = mak_template.format(pkg = pkg)
-    fpath = get_make_fpath(pkg.name)
+    # output
+    mdata = mak_template.format(mak = mak)
+    fpath = get_make_fpath(mak.name)
     fpath.write_text(mdata)
     return True
 
