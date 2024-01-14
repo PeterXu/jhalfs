@@ -58,70 +58,74 @@ content:
 
 #==================================================
 
+define head
+ 
+endef
 define crlf
 
 
 endef
+mark = <<newline>>
 
 preproc:
 	$(info ===== PreProc of $(Z_NAME)/$(Z_VER) =====)
 ifeq ($(Z_EXEC),1)
-	@echo ">";$(ZS_PREPROC)
+	@$(subst $(mark),,$(ZS_PREPROC))
 else
-	$(info $(subst ; ,$(crlf),$(ZS_PREPROC)))
+	$(info $(head)$(subst $(mark),$(crlf),$(ZS_PREPROC)))
 endif
 	@echo
 
 config:
 	$(info ===== Config of $(Z_NAME)/$(Z_VER) =====)
 ifeq ($(Z_EXEC),1)
-	@echo ">";$(ZS_CONFIG)
+	@$(subst $(mark),,$(ZS_CONFIG))
 else
-	$(info $(subst ; ,$(crlf),$(ZS_CONFIG)))
+	$(info $(head)$(subst $(mark),$(crlf),$(ZS_CONFIG)))
 endif
 
 build:
 	$(info ===== Build of $(Z_NAME)/$(Z_VER) =====)
 ifeq ($(Z_EXEC),1)
-	@echo ">";$(ZS_BUILD)
+	@$(subst $(mark),,$(ZS_BUILD))
 else
-	$(info $(subst ; ,$(crlf),$(ZS_BUILD)))
+	$(info $(head)$(subst $(mark),$(crlf),$(ZS_BUILD)))
 endif
 	@echo
 
 test:
 	$(info ===== Test of $(Z_NAME)/$(Z_VER) =====)
 ifeq ($(Z_EXEC),1)
-	@echo ">";$(ZS_TEST)
+	@$(subst $(mark),,$(ZS_TEST))
 else
-	$(info $(subst ; ,$(crlf),$(ZS_TEST)))
+	$(info $(head)$(subst $(mark),$(crlf),$(ZS_TEST)))
 endif
 	@echo
 
 install:
 	$(info ===== Install of $(Z_NAME)/$(Z_VER) =====)
 ifeq ($(Z_EXEC),1)
-	@echo ">";$(ZS_INSTALL)
+	@$(subst $(mark),,$(ZS_INSTALL))
 else
-	$(info $(subst ; ,$(crlf),$(ZS_INSTALL)))
+	$(info $(head)$(subst $(mark),$(crlf),$(ZS_INSTALL)))
 endif
 	@echo
 
 postproc:
 	$(info ===== PostProc of $(Z_NAME)/$(Z_VER) =====)
 ifeq ($(Z_EXEC),1)
-	@echo ">";$(ZS_POSTPROC)
+	@$(subst $(mark),,$(ZS_POSTPROC))
 else
-	$(info $(subst ; ,$(crlf),$(ZS_POSTPROC)))
+	$(info $(head)$(subst $(mark),$(crlf),$(ZS_POSTPROC)))
 endif
 	@echo
 
 unknown:
 	$(info ===== Unknown of $(Z_NAME)/$(Z_VER) =====)
 ifeq ($(Z_EXEC),1)
-	@echo ">";$(ZS_UNKNOWN)
+	@$(subst $(mark),,$(ZS_UNKNOWN))
 else
-	$(info $(subst ; ,$(crlf),$(ZS_UNKNOWN)))
+	$(info $(head)$(subst $(mark),$(crlf),$(ZS_UNKNOWN)))
 endif
 	@echo
 

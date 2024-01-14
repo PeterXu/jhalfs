@@ -65,28 +65,37 @@ class Utils:
         return script.replace("$", "$$")
 
     @classmethod
-    def update_make_oneline(cls, script, sp=";"):
+    def update_make_oneline(cls, script, line_mark=""):
         if type(script) != type(""): return script
         parts = script.strip().split("\n")
         if len(parts) <= 1: return script
+        line_mark = " " + line_mark
 
         lines = []
-        endpos = len(parts) - 1
-        for item in parts[:endpos]:
-            add_comma = True
-            line = item.rstrip()
-            codes = line.split()
-            if len(codes) > 0:
-                if codes[0] in ["if", "elif", "else", "case", "select", "until", "while", "for"]:
-                    add_comma = False
-                if codes[0] in ["then", "in", "do"]:
-                    add_comma = False
-            if not line.endswith("\\"):
-                if add_comma and not line.endswith(";"): line += sp
-                line += " \\";
-            lines.append(line)
-        lines.append(parts[endpos])
-        #print(len(parts), len(lines))
+        preline = None
+        for item in parts:
+            curline = item.rstrip()
+            if preline:
+                add_sc = True
+                codes = preline.split()
+                if len(codes) > 0:
+                    if codes[0] in ["if", "elif", "else", "case", "select", "until", "while", "for"]:
+                        add_sc = False
+                    if codes[0] in ["then", "in", "do"]:
+                        add_sc = False
+                    #fi/esac/done: should add
+                if not preline.endswith("\\"):
+                    if preline.endswith(";"): add_sc = False
+                    elif preline.endswith(")"): add_sc = False
+                    if curline.lstrip().startswith(";") and not curline.lstrip().startswith(";;"):
+                        add_sc = False
+                    if add_sc:
+                        preline += ";"
+                    preline += line_mark
+                    preline += "\\"
+                lines.append(preline)
+            preline = curline
+        lines.append(preline)
         return "\n".join(lines)
 
     # fpath should be pathlib.Path

@@ -36,21 +36,25 @@ endef
 
 # step preproc
 define ZS_PREPROC
-echo "preproc begin"; \
-pwd; \
-cd /tmp/; \
-pwd; \
-uname -a; \
-echo $$PATH; \
-echo $$(gcc -dumpmachine); \
-echo $$; \
+echo "preproc begin"; <<newline>>\
+pwd; <<newline>>\
+cd /tmp/; <<newline>>\
+pwd; <<newline>>\
+uname -a; <<newline>>\
+echo $$PATH; <<newline>>\
+echo $$(gcc -dumpmachine); <<newline>>\
+echo $$; <<newline>>\
 echo 123 \
-	456 ; \
-case $$(uname -m) \
-in \
-  x86_64) echo 789; \
-;; \
-esac; \
+	456; <<newline>>\
+case $$(uname -m) <<newline>>\
+   in <<newline>>\
+   x86_64) <<newline>>\
+	 echo 789; <<newline>>\
+	;; <<newline>>\
+esac; <<newline>>\
+if [ 1 -eq 1 ]; then <<newline>>\
+	 echo 321; <<newline>>\
+fi; <<newline>>\
 echo preproc end
 endef
 

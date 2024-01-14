@@ -31,22 +31,22 @@ def get_data_dpath(dname):
 
 
 def todo_parse_repo(kind):
-    kind = "blfs"
+    kind = "lfs"
     db = get_repo_db(kind)
     for item in db.items:
         dname = get_temp_dpath(item.tmpdir)
         fname, ret = download_file(item.root, dname)
         if not fname: continue
-        Logger.i("read index:", item.root, fname, ret)
+        #Logger.i("read index:", item.root, fname, ret)
         results = []
         with open(fname, "rb") as f:
             results = parse_index(f.read(), item)
         datpath = get_data_dpath(item.datadir)
         for pkg in results:
             url = os.path.join(os.path.dirname(item.root), pkg[0])
-            print(url, dname, pkg[1])
+            #print(url, dname, pkg[1])
             parse_package(url, dname, pkg[1], datpath)
-            break
+            #break
     pass
 
 def parse_index(html_doc, repo):
@@ -73,7 +73,7 @@ def parse_index(html_doc, repo):
 
 def parse_package(url, dname, pname, datpath):
     fname, ret = download_file(url, dname)
-    print(url, fname, dname, ret)
+    #print(url, fname, dname, ret)
     if not fname: return False
     with open(fname, "rb") as f:
         data = parse_detail(pname, f.read())
@@ -262,6 +262,7 @@ def gen_makefile(name, data, datpath):
     mak.package["content"] = "\n".join(rets)
 
     rets = {}
+    line_mark = "<<newline>>"
     subdir_script = None
     install = data.get("h_install", [])
     if install:
@@ -323,7 +324,7 @@ def gen_makefile(name, data, datpath):
                 if detail.startswith("run_the_newly_compiled"):
                     index += 1 #bash
             #if name.lower() == "xml::parser": print(item[0], index, detail)
-            line = Utils.update_make_oneline(script, " ;")
+            line = Utils.update_make_oneline(script, line_mark)
             line = Utils.update_make_var(line)
             if have_subdir: subdir_script = line
             if index >= StepInstall.END: index = StepInstall.UNKNOWN
@@ -332,7 +333,7 @@ def gen_makefile(name, data, datpath):
             val.append(line)
             rets[key] = val
         pass
-    sp = " ; \\\n"
+    sp = "; %s\\\n" % line_mark
     for key in StepInstall:
         val = rets.get(key, [])
         lines = []
