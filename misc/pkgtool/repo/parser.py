@@ -12,45 +12,79 @@ from repo.template import mak_template
 from repo.db import get_repo_db
 
 
-def get_temp_dpath():
-    dpath = Path(tempfile.gettempdir()).joinpath(".zen_repo_0")
+def check_if_package(pname):
+    name = pname.strip()
+    pos = name.rfind("-")
+    if pos > 0 and Utils.check_if_version(name[pos+1:]):
+        return True
+    return False
+
+def get_temp_dpath(dname):
+    dpath = Path(tempfile.gettempdir()).joinpath(dname)
     dpath.mkdir(exist_ok=True)
     return dpath
 
-def get_make_fpath(name):
-    dpath = Path(os.path.realpath(os.curdir)).joinpath("repo/.data")
+def get_data_dpath(dname):
+    dpath = Path(os.path.realpath(os.curdir)).joinpath(dname)
     dpath.mkdir(exist_ok=True)
-    fpath = dpath.joinpath("Makefile.%s" % name.lower())
-    return fpath
+    return dpath
 
 
 def todo_parse_repo(kind):
+    kind = "blfs"
     db = get_repo_db(kind)
     for item in db.items:
-        url = os.path.join(db.root, item.uri)
-        parse_one_url(url)
+        dname = get_temp_dpath(item.tmpdir)
+        fname, ret = download_file(item.root, dname)
+        if not fname: continue
+        Logger.i("read index:", item.root, fname, ret)
+        results = []
+        with open(fname, "rb") as f:
+            results = parse_index(f.read(), item)
+        datpath = get_data_dpath(item.datadir)
+        for pkg in results:
+            url = os.path.join(os.path.dirname(item.root), pkg[0])
+            print(url, dname, pkg[1])
+            parse_package(url, dname, pkg[1], datpath)
+            break
     pass
 
-def parse_one_url(url):
-    fname, _ = download_file(url)
+def parse_index(html_doc, repo):
+    results = []
+    is_start = False
+    soup = BeautifulSoup(html_doc, 'html.parser')
+    elements = soup.select("div.book>div.toc>ul>li>ul>li")
+    for e in elements:
+        title = e.select_one("h4")
+        if not title: continue
+        if title.text.strip().find(repo.start) != -1:
+            is_start = True
+        if not is_start: continue
+        if title.text.strip().find(repo.stop) != -1:
+            break
+        items = e.select("li>a")
+        for item in items:
+            link = item.get("href", None)
+            if not link or not check_if_package(item.text):
+                continue
+            results.append([link, item.text])
+        pass
+    return results
+
+def parse_package(url, dname, pname, datpath):
+    fname, ret = download_file(url, dname)
+    print(url, fname, dname, ret)
     if not fname: return False
-    with open(fname) as f1:
-        results = parse_toc(f1.read())
-        for item in results:
-            sname, ret = download_file(url, item[0])
-            if not sname: continue
-            name = item[1]
-            with open(sname) as f2:
-                data = parse_detail(name, f2.read())
-                gen_makefile(name, data)
-            if ret == 2:
-                time.sleep(random.choice([0.1, 0.3, 0.1]))
-            #break
+    with open(fname, "rb") as f:
+        data = parse_detail(pname, f.read())
+        gen_makefile(pname, data, datpath)
+    if ret == 2:
+        time.sleep(random.choice([0.1, 0.3, 0.1, 0.1, 0.2]))
     return True
 
-def download_file(url, name=None):
+def download_file(url, dname, name=None):
     if not url: return None, -1
-    dname = get_temp_dpath()
+    if not os.path.exists(dname): return None, -1
     bname = name if name else os.path.basename(url)
     fname = os.path.join(dname, bname)
     if os.path.exists(fname): return fname, 1
@@ -59,7 +93,7 @@ def download_file(url, name=None):
     fname = Utils.download_url(furl, dname)
     return fname, 2
 
-#document.querySelectorAll("div.toc>ul>li>a")
+#chapter08/chapter08.html: document.querySelectorAll("div.toc>ul>li>a")
 def parse_toc(html_doc):
     results = []
     soup = BeautifulSoup(html_doc, 'html.parser')
@@ -67,9 +101,7 @@ def parse_toc(html_doc):
     for item in elements:
         link = item.get("href")
         if not link: continue
-        tname = item.text.strip()
-        pos = tname.rfind("-")
-        if pos < 0 or not Utils.check_if_version(tname[pos+1:]):
+        if not check_if_package(item.text):
             Logger.w("skip link:", link)
             continue
         bname = os.path.basename(link)
@@ -102,21 +134,30 @@ def parse_detail(name, html_doc):
         data = [hintro, hinfo, []]
     else:
         ptr = None
-        hintro, hinfo, hdeps  = [], [], []
-        for e in package.select("*"):
-            if e.name == "h2": ptr = hintro
+        hintro, hinfo, hdeps  = [""], [""], [""]
+        for e in package.find_all(recursive=False):
+            is_top = False
+            if e.name == "h2":
+                ptr = hintro
+                is_top = True
             elif e.name == "p": pass
             elif e.name == "h3":
                 text = e.text.rstrip()
-                if text.endswith("Package Information"): ptr = hinfo
-                elif text.endswith("Dependencie"): ptr = hdeps
+                if text.endswith("Package Information"):
+                    ptr = hinfo
+                    is_top = True
+                elif text.endswith("Dependencies"):
+                    ptr = hdeps
+                    is_top = True
             elif e.name == "div":
                 for i in e.select("ul.compact>li.listitem"):
-                    if ptr: ptr.append(i.text)
+                    if ptr: ptr.append(i.text.strip())
                 e = None
             elif e.name == "h4": pass
-            if ptr and e: ptr.append(e.text)
-        data = [hintro, hinfo, hdeps]
+            if ptr and e:
+                ptr.append(e.text.strip())
+                if is_top: ptr.append("")
+        data = [hintro[1:], hinfo[1:], hdeps[1:]]
     results["h_package"] = data
 
     # B. parse <div.installation>: build/install
@@ -194,8 +235,8 @@ class MakDetail(object):
     package = {}
     scripts = {}
 
-def gen_makefile(name, data):
-    if not name or not data:
+def gen_makefile(name, data, datpath):
+    if not name or not data or not datpath:
         return False
     name = name.split()[0]
 
@@ -268,17 +309,21 @@ def gen_makefile(name, data):
                     index = StepInstall.INSTALL #jinja2/meson/markupsafe/flit-core/gcc/..
                 elif detail.startswith("install_%s" % name.lower()):
                     index = StepInstall.INSTALL #wheel
+                elif detail.startswith("to_install_the"):
+                    index = StepInstall.INSTALL #make-ca
                 if k >= index: index = k; break
                 #>postproc
                 k = index - 1
-                if detail.find("sanity_checks") != -1:
+                if detail.find("the_following_command") != -1:
+                    index = StepInstall.POSTPROC #make-ca
+                elif detail.find("sanity_checks") != -1:
                     index = StepInstall.POSTPROC #gcc
                 if k >= index: index = k; break
                 #>others...
                 if detail.startswith("run_the_newly_compiled"):
                     index += 1 #bash
             #if name.lower() == "xml::parser": print(item[0], index, detail)
-            line = Utils.update_make_oneline(script)
+            line = Utils.update_make_oneline(script, " ;")
             line = Utils.update_make_var(line)
             if have_subdir: subdir_script = line
             if index >= StepInstall.END: index = StepInstall.UNKNOWN
@@ -287,7 +332,7 @@ def gen_makefile(name, data):
             val.append(line)
             rets[key] = val
         pass
-    sp = "; \\\n"
+    sp = " ; \\\n"
     for key in StepInstall:
         val = rets.get(key, [])
         lines = []
@@ -298,7 +343,8 @@ def gen_makefile(name, data):
 
     # output
     mdata = mak_template.format(mak = mak)
-    fpath = get_make_fpath(mak.name)
+    fpath = datpath.joinpath("Makefile.%s" % mak.name.lower())
+    #print(fpath)
     fpath.write_text(mdata)
     return True
 

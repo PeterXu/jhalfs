@@ -4,4 +4,5 @@ build
 dist
 repo/Makefile.*
 *.spec
-repo/.data
+.zen_data_lfs
+.zen_data_blfs

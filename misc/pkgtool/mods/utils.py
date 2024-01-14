@@ -65,7 +65,7 @@ class Utils:
         return script.replace("$", "$$")
 
     @classmethod
-    def update_make_oneline(cls, script):
+    def update_make_oneline(cls, script, sp=";"):
         if type(script) != type(""): return script
         parts = script.strip().split("\n")
         if len(parts) <= 1: return script
@@ -82,7 +82,7 @@ class Utils:
                 if codes[0] in ["then", "in", "do"]:
                     add_comma = False
             if not line.endswith("\\"):
-                if add_comma and not line.endswith(";"): line += ";"
+                if add_comma and not line.endswith(";"): line += sp
                 line += " \\";
             lines.append(line)
         lines.append(parts[endpos])
