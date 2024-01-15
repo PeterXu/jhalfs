@@ -7,7 +7,7 @@ import tempfile
 from pathlib import Path
 from bs4 import BeautifulSoup
 
-from mods.utils import Logger, Utils, EmptyObject
+from mods.utils import Log, Utils, EmptyObject
 from repo.template import mak_template
 from repo.db import get_repo_db
 
@@ -31,13 +31,13 @@ def get_data_dpath(dname):
 
 
 def todo_parse_repo(kind):
-    kind = "lfs"
+    kind = "blfs"
     db = get_repo_db(kind)
     for item in db.items:
         dname = get_temp_dpath(item.tmpdir)
         fname, ret = download_file(item.root, dname)
         if not fname: continue
-        #Logger.i("read index:", item.root, fname, ret)
+        #Log.i("read index:", item.root, fname, ret)
         results = []
         with open(fname, "rb") as f:
             results = parse_index(f.read(), item)
@@ -102,7 +102,7 @@ def parse_toc(html_doc):
         link = item.get("href")
         if not link: continue
         if not check_if_package(item.text):
-            Logger.w("skip link:", link)
+            Log.w("skip link:", link)
             continue
         bname = os.path.basename(link)
         #if bname in repo.start_uris: continue
@@ -164,13 +164,21 @@ def parse_detail(name, html_doc):
     data = []
     installation = soup.select_one("body.%s>div>div.installation" % kind)
     if installation:
-        last_p = None
-        for e in installation.find_all(recursive=False):
-            if e.name == "pre":
-                cmd = e.select_one("kbd.command")
-                if cmd: data.append([last_p, cmd.text.strip()])
-                last_p = None
-            elif e.name == "p": last_p = e.text.strip()
+        def parse_kbd_command(one):
+            last_p = None
+            for e in one.find_all(recursive=False):
+                if e.name == "pre":
+                    cmd = e.select_one("kbd.command")
+                    if cmd: data.append([last_p, cmd.text.strip()])
+                    last_p = None
+                elif e.name == "p": last_p = e.text.strip()
+        parse_kbd_command(installation)
+        if not data:
+            for one in installation.select("div.sect3"):
+                parse_kbd_command(one)
+    if not data:
+        Log.w("No installation for", name)
+        return False
     results["h_install"] = data
 
     # C. parse <div.configuration>: post-install config
@@ -183,8 +191,24 @@ def parse_detail(name, html_doc):
             elif e.name == "pre":
                 lines.append("<code>\n%s\n<code>" % e.text)
             elif e.name == "div": pass
-            data.append(lines)
+        data.append(lines)
+    if not data:
+        #Log.w("No configuration for", name)
+        pass
     results["h_config"] = data
+
+    # C.1 parse <div.commands>
+    data = []
+    commands = soup.select("body.%s>div>div.commands" % kind)
+    for cmd in commands:
+        lines = []
+        for e in cmd.find_all(recursive=False):
+            if e.name in ["h2", "p"]: lines.append(e.text)
+        data.append(lines)
+    if not data:
+        #Log.w("No commands for", name)
+        pass
+    results["h_command"] = data
 
     # D. parse <div.content>: post-install content
     data = []
@@ -194,6 +218,9 @@ def parse_detail(name, html_doc):
         items2 = parse_variablelist_items(name, content)
         data = [items1, items2]
         #if name.lower().startswith("acl"): print(data)
+    if not data:
+        Log.w("No content for", name)
+        #return False
     results["h_content"] = data
     return results
 
@@ -251,14 +278,16 @@ def gen_makefile(name, data, datpath):
     #print(name, mak.name, mak.version)
 
     package = data.get("h_package", [[], [], []])
-    mak.package["intro"] = "\n".join(package[0])
-    mak.package["info"] = "\n".join(package[1])
-    mak.package["deps"] = "\n".join(package[2])
+    if package:
+        mak.package["intro"] = "\n".join(package[0])
+        mak.package["info"] = "\n".join(package[1])
+        mak.package["deps"] = "\n".join(package[2])
 
     rets = []
     content = data.get("h_content", [[], []])
-    rets.extend(content[0])
-    for item in content[1]: rets.append(": ".join(item))
+    if content:
+        rets.extend(content[0])
+        for item in content[1]: rets.append(": ".join(item))
     mak.package["content"] = "\n".join(rets)
 
     rets = {}
@@ -307,18 +336,18 @@ def gen_makefile(name, data, datpath):
                 #>install
                 k = index - 1
                 if detail.startswith("install_the_package"):
-                    index = StepInstall.INSTALL #jinja2/meson/markupsafe/flit-core/gcc/..
+                    k = StepInstall.INSTALL #jinja2/meson/markupsafe/flit-core/gcc/..
                 elif detail.startswith("install_%s" % name.lower()):
-                    index = StepInstall.INSTALL #wheel
+                    k = StepInstall.INSTALL #wheel
                 elif detail.startswith("to_install_the"):
-                    index = StepInstall.INSTALL #make-ca
+                    k = StepInstall.INSTALL #make-ca
                 if k >= index: index = k; break
                 #>postproc
                 k = index - 1
                 if detail.find("the_following_command") != -1:
-                    index = StepInstall.POSTPROC #make-ca
+                    k = StepInstall.POSTPROC #make-ca
                 elif detail.find("sanity_checks") != -1:
-                    index = StepInstall.POSTPROC #gcc
+                    k = StepInstall.POSTPROC #gcc
                 if k >= index: index = k; break
                 #>others...
                 if detail.startswith("run_the_newly_compiled"):

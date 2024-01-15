@@ -19,7 +19,7 @@ class EmptyObject(object):
         return len(self.__dict__)
 
 
-class Logger:
+class Log:
     @classmethod
     def i(cls, *args, **kwargs):
         print("[INFO]", *args, **kwargs, file=sys.stdout)
@@ -87,7 +87,9 @@ class Utils:
                 if not preline.endswith("\\"):
                     if preline.endswith(";"): add_sc = False
                     elif preline.endswith(")"): add_sc = False
-                    if curline.lstrip().startswith(";") and not curline.lstrip().startswith(";;"):
+                    elif preline.endswith("&"): add_sc = False
+                    line0 = curline.lstrip()
+                    if line0.startswith(";") and not line0.startswith(";;"):
                         add_sc = False
                     if add_sc:
                         preline += ";"
@@ -113,20 +115,20 @@ class Utils:
     def download_url(cls, url, dname, fname=None):
         dname = os.path.expanduser(dname)
         if not os.path.exists(dname):
-            Logger.w("Output directory not exist: <%s>!" % dname)
+            Log.w("Output directory not exist: <%s>!" % dname)
             return False
         if not fname: fname = os.path.basename(url)
         fpath = os.path.join(dname, fname)
         if os.path.exists(fpath):
-            Logger.w("Output filename is exist: <%s>!" % fpath)
+            Log.w("Output filename is exist: <%s>!" % fpath)
             return False
         try:
             urllib.request.urlretrieve(url, fpath)
             return fpath
         except (urllib.error.URLError, IOError) as e:
-            Logger.e("Download failed with error: ", e)
+            Log.e("Download failed with error: ", e)
         except Exception as ex:
-            Logger.w("Download failed with exception: ", ex)
+            Log.w("Download failed with exception: ", ex)
         return False
 
 
