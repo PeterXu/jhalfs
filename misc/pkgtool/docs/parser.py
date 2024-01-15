@@ -32,10 +32,9 @@ def todo_parse_docs(fname):
     for item in docs:
         if last_item:
             name, doc, key = None, None, None
-            if item[0] == "def" and last_item[0] == "doc" and last_item[2].start[1] == 0:
-                name, doc, key = item[1], last_item[1], "detail"
-            elif item[0] == "doc" and last_item[0] == "def" and item[2].start[1] > 0:
-                name, doc, key = last_item[1], item[1], "simple"
+            if item[0] == "doc" and last_item[0] == "def" and item[2].start[1] > 0:
+                if last_item[2].start[0] + 1 == item[2].start[0]:
+                    name, doc, key = last_item[1], item[1], "simple"
             if key: cmd_docs.append([name, key, doc])
         last_item = item
     return cmd_docs
