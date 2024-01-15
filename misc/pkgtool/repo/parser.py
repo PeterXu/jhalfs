@@ -31,23 +31,26 @@ def get_data_dpath(dname):
 
 
 def todo_parse_repo(kind):
-    kind = "blfs"
+    Log.i('Try to update repo:', kind)
+    #kind = "blfs"
     db = get_repo_db(kind)
     if not db: return None
     for item in db.items:
         dname = get_temp_dpath(item.tmpdir)
         fname, ret = download_file(item.root, dname)
         if not fname: continue
-        #Log.i("read index:", kind, item.root, fname, ret)
+        Log.i("To read one %s-index:" % kind, item.root)
         results = []
         with open(fname, "rb") as f:
             results = parse_index(f.read(), item)
+        Log.i("The package number of current index:", len(results))
         datpath = get_data_dpath(item.datadir)
         for pkg in results:
             url = os.path.join(os.path.dirname(item.root), pkg[0])
             #print(kind, url, dname, pkg[1])
             parse_package(kind, url, dname, pkg[1], datpath)
-    pass
+    Log.i('End to update repo:', kind)
+    return True
 
 def parse_index(html_doc, repo):
     results = []

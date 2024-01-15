@@ -4,6 +4,7 @@
 import os
 import sys
 import enum
+import argparse
 from pathlib import Path
 
 
@@ -11,7 +12,8 @@ from pathlib import Path
 ## >P0: command kind/parse
 ##=========================
 
-class CommandKind(enum.Enum):
+@enum.unique
+class CommandKind(enum.IntEnum):
     ALL             = 1,
     COMMON_USAGE    = 21,
     TROUBLE_SHOOT   = 22,
@@ -487,7 +489,7 @@ def _do_init():
         _add_cmd_prop(_parse_cmd(name), key, doc)
     pass
 
-def _do_gen_docs():
+def _do_gen_docs(args):
     try:
         items = todo_parse_docs(__file__)
     except:
@@ -504,8 +506,13 @@ def _do_gen_docs():
         fp.write(']')
     pass
 
-def _do_gen_repo():
-    todo_parse_repo(None)
+def _do_gen_repo(args):
+    parser = argparse.ArgumentParser(
+                prog="zen gen-repo",
+                description='Generate repository.')
+    parser.add_argument('--site', help='supported sites', choices=['lfs', 'blfs'], required=True)
+    rets = parser.parse_args(args)
+    todo_parse_repo(rets.site)
     pass
 
 if __name__ == '__main__':
@@ -517,7 +524,7 @@ if __name__ == '__main__':
         if sys.argv[1] == "gen-docs":
             _do_gen_docs()
         elif sys.argv[1] == "gen-repo":
-            _do_gen_repo()
+            _do_gen_repo(sys.argv[2:])
         sys.exit(0)
     cmd = _get_cmd(sys.argv[1])
     bret = cmd["func"](sys.argv[2:]) if cmd else None
