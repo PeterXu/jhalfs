@@ -33,20 +33,20 @@ def get_data_dpath(dname):
 def todo_parse_repo(kind):
     kind = "blfs"
     db = get_repo_db(kind)
+    if not db: return None
     for item in db.items:
         dname = get_temp_dpath(item.tmpdir)
         fname, ret = download_file(item.root, dname)
         if not fname: continue
-        #Log.i("read index:", item.root, fname, ret)
+        #Log.i("read index:", kind, item.root, fname, ret)
         results = []
         with open(fname, "rb") as f:
             results = parse_index(f.read(), item)
         datpath = get_data_dpath(item.datadir)
         for pkg in results:
             url = os.path.join(os.path.dirname(item.root), pkg[0])
-            #print(url, dname, pkg[1])
-            parse_package(url, dname, pkg[1], datpath)
-            #break
+            #print(kind, url, dname, pkg[1])
+            parse_package(kind, url, dname, pkg[1], datpath)
     pass
 
 def parse_index(html_doc, repo):
@@ -71,13 +71,13 @@ def parse_index(html_doc, repo):
         pass
     return results
 
-def parse_package(url, dname, pname, datpath):
+def parse_package(kind, url, dname, pname, datpath):
     fname, ret = download_file(url, dname)
     #print(url, fname, dname, ret)
     if not fname: return False
     with open(fname, "rb") as f:
-        data = parse_detail(pname, f.read())
-        gen_makefile(pname, data, datpath)
+        data = parse_detail(kind, pname, f.read())
+        gen_makefile(kind, pname, data, datpath)
     if ret == 2:
         time.sleep(random.choice([0.1, 0.3, 0.1, 0.1, 0.2]))
     return True
@@ -115,13 +115,9 @@ def parse_toc(html_doc):
 #document.querySelector("body.blfs>div>div.package")
 #document.querySelectorAll("div>div.installation>pre.userinput>kbd.command")
 #document.querySelector("div>div.content")
-def parse_detail(name, html_doc):
+def parse_detail(kind, name, html_doc):
     results = {}
     soup = BeautifulSoup(html_doc, 'html.parser')
-    kind = "lfs"
-    if not soup.select_one("body.lfs"):
-        kind = "blfs"
-        if not soup.select_one("body.blfs"): return False
 
     # A. parse <div.package>: basic info
     data = []
@@ -262,8 +258,98 @@ class MakDetail(object):
     package = {}
     scripts = {}
 
-def gen_makefile(name, data, datpath):
-    if not name or not data or not datpath:
+def parse_lfs_install(name, detail, script, index):
+    if not detail: detail = ""
+    detail = Utils.replace_all_spaces(detail, "_").lower()
+    sh_subdir = []
+    for i in [0]:
+        ##>config
+        k = index - 1
+        if detail.startswith("prepare_%s_for_compilation" % name.lower()):
+            k = StepInstall.CONFIG #gcc/glibc/xml-parser
+        elif detail.find("dedicated_build_directory") != -1:
+            k = StepInstall.CONFIG #gcc/glibc
+            sh_subdir = [k, "mkdir -p build && cd build"]
+        elif detail.find("built_in_a_subdirectory") != -1:
+            k = StepInstall.CONFIG #e2fsprogs
+            sh_subdir = [k, "mkdir -p build && cd build"]
+        if k >= index: index = k; break
+        sh_subdir = []
+        ##>build
+        k = index - 1
+        if detail.startswith("compile_the_package"):
+            k = StepInstall.BUILD  #gcc/glibc/xml-parser
+        elif detail.startswith("compile_%s" % name.lower()):
+            k = StepInstall.BUILD  #wheel/meson/markupsafe/flit-core
+        elif detail.startswith("build_the_package"):
+            k = StepInstall.BUILD  #jinja2
+        elif detail.startswith("build_%s" % name.lower()):
+            k = StepInstall.BUILD
+        if k >= index: index = k; break
+        ##>test
+        k = index - 1
+        if detail.find("_tests_") != -1 or detail.startswith("to_test_the") or detail.startswith("test_the"):
+            k = StepInstall.TEST #binutils
+        if k >= index: index = k; break
+        ##>install
+        k = index - 1
+        if detail.startswith("install_the_package"):
+            k = StepInstall.INSTALL #jinja2/meson/markupsafe/flit-core/gcc/..
+        elif detail.startswith("install_%s" % name.lower()):
+            k = StepInstall.INSTALL #wheel
+        elif detail.startswith("build_and_install_the_package"):
+            k = StepInstall.INSTALL #dejagnu
+        if k >= index: index = k; break
+        ##>postproc
+        k = index - 1
+        if detail.find("sanity_checks") != -1:
+            k = StepInstall.POSTPROC #gcc
+        if k >= index: index = k; break
+        ##>others...
+        if detail.startswith("run_the_newly_compiled"):
+            index += 1 #bash
+    return index, sh_subdir
+
+def parse_blfs_install(name, detail, script, index):
+    if not detail: detail = ""
+    detail = Utils.replace_all_spaces(detail, "_").lower()
+    script = Utils.replace_all_spaces(script, "_").lower()
+    sh_subdir = []
+    for i in [0]:
+        ##>config
+        k = index - 1
+        if k >= index: index = k; break
+        ##>build
+        k = index - 1
+        if detail.find("install_%s_by_running" % name.lower()) != -1:
+            k = StepInstall.BUILD
+            if script.find("mkdir_build") != -1 or script.find("mkdir_-v_build") != -1:
+                if script.find("cd_build") != -1:
+                    sh_subdir = [k, "mkdir -p build && cd build"]
+        if k >= index: index = k; break
+        sh_subdir = []
+        ##>test
+        k = index - 1
+        if detail.find("_tests_") != -1 or detail.startswith("to_test_the") or detail.startswith("test_the"):
+            k = StepInstall.TEST #binutils
+        if k >= index: index = k; break
+        ##>install
+        k = index - 1
+        if detail.startswith("now,_as_the_root_user"):
+            k = StepInstall.INSTALL
+        elif script.startswith("make_install"):
+            k = StepInstall.INSTALL
+        if k >= index: index = k; break
+        ##>postproc
+        k = index - 1
+        if detail.find("the_following_command") != -1 and index == StepInstall.INSTALL:
+            k = StepInstall.POSTPROC
+        if k >= index: index = k; break
+        ##>others...
+    return index, sh_subdir
+
+def gen_makefile(kind, name, data, datpath):
+    if not kind or not name or not data or not datpath:
         return False
     name = name.split()[0]
 
@@ -293,69 +379,19 @@ def gen_makefile(name, data, datpath):
     rets = {}
     line_mark = "<<newline>>"
     subdir_script = None
+    subdir_index = StepInstall.PREPROC
     install = data.get("h_install", [])
     if install:
         index = StepInstall.PREPROC
+        #print(name, len(install))
         for item in install:
             detail, script = item
-            if not detail: detail = ""
-            detail = Utils.replace_all_spaces(detail, "_").lower()
-
-            have_subdir = False
-            for i in [0]:
-                #>config
-                k = index - 1
-                if detail.startswith("prepare_%s_for_compilation" % name.lower()):
-                    k = StepInstall.CONFIG #gcc/glibc/xml-parser
-                elif detail.find("dedicated_build_directory") != -1:
-                    k = StepInstall.CONFIG #gcc/glibc
-                    have_subdir = True
-                elif detail.find("built_in_a_subdirectory") != -1:
-                    k = StepInstall.CONFIG #e2fsprogs
-                    have_subdir = True
-                if k >= index: index = k; break
-                have_subdir = False
-                #>build
-                k = index - 1
-                if detail.startswith("compile_the_package"):
-                    k = StepInstall.BUILD  #gcc/glibc/xml-parser
-                elif detail.startswith("compile_%s" % name.lower()):
-                    k = StepInstall.BUILD  #wheel/meson/markupsafe/flit-core
-                elif detail.startswith("build_the_package"):
-                    k = StepInstall.BUILD  #jinja2
-                elif detail.startswith("build_%s" % name.lower()):
-                    k = StepInstall.BUILD
-                elif detail.startswith("build_and_install_the_package"):
-                    k = StepInstall.BUILD #dejagnu
-                if k >= index: index = k; break
-                #>test
-                k = index - 1
-                if detail.find("_tests_") != -1 or detail.startswith("to_test_the") or detail.startswith("test_the"):
-                    k = StepInstall.TEST #binutils
-                if k >= index: index = k; break
-                #>install
-                k = index - 1
-                if detail.startswith("install_the_package"):
-                    k = StepInstall.INSTALL #jinja2/meson/markupsafe/flit-core/gcc/..
-                elif detail.startswith("install_%s" % name.lower()):
-                    k = StepInstall.INSTALL #wheel
-                elif detail.startswith("to_install_the"):
-                    k = StepInstall.INSTALL #make-ca
-                if k >= index: index = k; break
-                #>postproc
-                k = index - 1
-                if detail.find("the_following_command") != -1:
-                    k = StepInstall.POSTPROC #make-ca
-                elif detail.find("sanity_checks") != -1:
-                    k = StepInstall.POSTPROC #gcc
-                if k >= index: index = k; break
-                #>others...
-                if detail.startswith("run_the_newly_compiled"):
-                    index += 1 #bash
+            fn_parse = parse_lfs_install if kind == "lfs" else parse_blfs_install
+            index, sh_subdir = fn_parse(name, detail, script, index)
             #if name.lower() == "xml::parser": print(item[0], index, detail)
             line = Utils.update_make_oneline(script, line_mark)
             line = Utils.update_make_var(line)
-            if have_subdir: subdir_script = line
+            if sh_subdir: subdir_index, subdir_script = sh_subdir
             if index >= StepInstall.END: index = StepInstall.UNKNOWN
             key = StepInstall(index)
             val = rets.get(key, [])
@@ -366,7 +402,7 @@ def gen_makefile(name, data, datpath):
     for key in StepInstall:
         val = rets.get(key, [])
         lines = []
-        if val and key > StepInstall.CONFIG and subdir_script:
+        if val and key > subdir_index and subdir_script:
             lines.append(subdir_script)
         lines.extend(val)
         mak.scripts[key.name.lower()] = sp.join(lines)

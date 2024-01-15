@@ -20,10 +20,13 @@ blfs_items = [
     },
 ]
 
-def get_repo_db(kind=None):
+def get_repo_db(kind):
+    items = None
+    if kind == "lfs":    items = lfs_items
+    elif kind == "blfs": items = blfs_items
+    if not items: return None
     obj = EmptyObject()
     obj.items = []
-    items = lfs_items if kind != "blfs" else blfs_items
     for item in items:
         one = EmptyObject()
         one.setattrs(item)
